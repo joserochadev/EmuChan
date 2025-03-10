@@ -102,15 +102,18 @@ impl UI {
 				}
 			}
 
-			self.main_canvas.set_draw_color(Color::RGB(0, 0, 0));
-			self.main_canvas.clear();
+			// self.main_canvas.set_draw_color(Color::RGB(0, 0, 0));
+			// self.main_canvas.clear();
+			// self.main_canvas.present();
+
+			self.update_main_window();
 			self.main_canvas.present();
 
-			self.debug_canvas.set_draw_color(Color::RGB(50, 50, 50));
-			self.debug_canvas.clear();
+			// self.debug_canvas.set_draw_color(Color::RGB(50, 50, 50));
+			// self.debug_canvas.clear();
 
-			self.update_debug_window();
-			self.debug_canvas.present();
+			// self.update_debug_window();
+			// self.debug_canvas.present();
 		}
 	}
 
@@ -170,6 +173,32 @@ impl UI {
 				let y_draw = row * (8 * self.scale + spacing);
 				self.display_tile(addr, tile_num, x_draw, y_draw);
 				tile_num += 1;
+			}
+		}
+	}
+
+	fn update_main_window(&mut self) {
+		let ppu = self.ppu.lock().unwrap();
+
+		let screen_width = 160 as i32;
+		let screen_height = 144 as i32;
+
+		for y in 0..screen_height {
+			for x in 0..screen_width {
+				let pixel_index = (y as usize * screen_width as usize) + x as usize;
+				let color = COLOR_PALLET[ppu.video_buffer[pixel_index] as usize];
+
+				let pixel_x = x * 4;
+				let pixel_y = y * 4;
+
+				let width = 4;
+				let height = 4;
+
+				self.main_canvas.set_draw_color(color);
+				self
+					.main_canvas
+					.fill_rect(Rect::new(pixel_x, pixel_y, width as u32, height as u32))
+					.unwrap();
 			}
 		}
 	}

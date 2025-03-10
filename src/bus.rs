@@ -98,6 +98,17 @@ impl BUS {
 
 		if addr < 0xFF80 {
 			// I/O Registers
+			if addr >= 0xFF40 && addr <= 0xFF4B {
+				if addr == 0xFF46 {
+					debug!("Accessing OAM DMA at 0x{:04X}", addr);
+					return self.memory[addr as usize];
+				}
+
+				if let Some(ppu) = &self.ppu {
+					let ppu = ppu.lock().unwrap();
+					return ppu.read(addr);
+				}
+			}
 			debug!("Accessing I/O Registers at 0x{:04X}", addr);
 			return self.memory[addr as usize];
 		}
@@ -186,6 +197,20 @@ impl BUS {
 				debug!("Boot Rom Disabled.");
 				return;
 			}
+
+			if addr >= 0xFF40 && addr <= 0xFF4B {
+				if addr == 0xFF46 {
+					debug!("Writing to OAM DMA at 0x{:04X}", addr);
+					self.memory[addr as usize] = data;
+					return;
+				}
+
+				if let Some(ppu) = &self.ppu {
+					let mut ppu = ppu.lock().unwrap();
+					ppu.write(addr, data);
+					return;
+				}
+			}
 			// I/O Registers
 			debug!("Writing to I/O Registers at 0x{:04X}", addr);
 			self.memory[addr as usize] = data;
@@ -213,5 +238,13 @@ impl BUS {
 
 	pub fn ppu_connect(&mut self, ppu: Arc<Mutex<PPU>>) {
 		self.ppu = Some(ppu);
+	}
+
+	pub fn _dump_hram(&self) {
+		println!("HRAM Dump (0xFF80 - 0xFFFE):");
+		for i in 0xFF80..=0xFFFE {
+			print!("{:02X} ", self.memory[i as usize]);
+		}
+		println!();
 	}
 }

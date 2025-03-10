@@ -34,12 +34,12 @@ struct CLI {
 #[derive(Subcommand)]
 enum Commands {
 	/// Starts the emulator and runs the loaded ROM.
-	/// 
+	///
 	/// Example:
 	/// ```
 	/// cargo run -- run path/to/rom.gb
 	/// ```
-	RUN { path: String},
+	RUN { path: String },
 
 	/// Runs a specific test from a JSON file.
 	///
@@ -65,14 +65,14 @@ enum Commands {
 }
 
 fn main() {
-	env::set_var("RUST_LOG", "trace"); // defice RUST_LOG env
+	//env::set_var("RUST_LOG", "trace"); // defice RUST_LOG env
 
 	env_logger::init(); // Initialize logger
 
 	let cli = CLI::parse();
 
 	match cli.command {
-		Commands::RUN {path} => {
+		Commands::RUN { path } => {
 			println!("🔄 Starting the emulator...");
 			let mut emuchan = EmuChan::new(Some(path));
 			emuchan.run();

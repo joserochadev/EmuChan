@@ -144,7 +144,7 @@ impl CPU {
 	}
 
 	pub fn set_cycles(&mut self, t_cycles: usize) {
-		self.cycles = t_cycles;
+		self.cycles = t_cycles / 4; // convert to M-Cycles
 	}
 
 	pub fn fetch(&mut self) -> u8 {

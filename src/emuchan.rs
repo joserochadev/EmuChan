@@ -38,11 +38,10 @@ pub struct EmuChan {
 	pub cartridge: Arc<Mutex<Cartridge>>,
 	pub ui: UI,
 	pub emulation_state: Arc<Mutex<EmulationState>>,
-
 }
 
 impl EmuChan {
-	pub fn new(rom_path: Option<String> ) -> Self {
+	pub fn new(rom_path: Option<String>) -> Self {
 		let bus = Arc::new(Mutex::new(BUS::new()));
 		let cpu = Arc::new(Mutex::new(CPU::new(Arc::clone(&bus))));
 		let ppu = Arc::new(Mutex::new(PPU::new()));
@@ -61,7 +60,7 @@ impl EmuChan {
 			// Load boot in memory
 			bus.memory[0..=255].copy_from_slice(&BOOT_DMG);
 			// Simulating v-blank period
-			bus.write(0xFF44, 0x90);
+			// bus.write(0xFF44, 0x90);
 		}
 
 		{
@@ -92,21 +91,38 @@ impl EmuChan {
 
 	pub fn run(&mut self) {
 		let cpu_clone = Arc::clone(&self.cpu);
+		let ppu_clone = Arc::clone(&self.ppu);
 		let emulation_state_clone = Arc::clone(&self.emulation_state);
 
 		thread::spawn(move || {
-			let mut cpu = cpu_clone.lock().unwrap();
 			let mut emulation_state = emulation_state_clone.lock().unwrap();
-
 			while *emulation_state == EmulationState::RUNNING {
+				// CPU step
+				let mut cpu = cpu_clone.lock().unwrap();
 				if let Err(e) = cpu.step() {
 					*emulation_state = EmulationState::PAUSED;
 					println!("EmuChan is PAUSED.");
 					println!("{}\n{}", e, cpu);
 				}
+
+				// PPU step
+				let mut ppu = ppu_clone.lock().unwrap();
+				for _ in 0..cpu.cycles {
+					for _ in 0..4 {
+						ppu.step();
+					}
+				}
 			}
 		});
 
 		self.ui.run();
+
+		// self.ppu.lock().unwrap()._dump_oam(0xfe00, 0xfe9f);
+		// self.ppu.lock().unwrap()._dump_vram(0x8000, 0x9fff);
+		// println!("{}", self.ppu.lock().unwrap());
+		print!("{}", self.cpu.lock().unwrap());
+		// println!("{:?}", self.bus.lock().unwrap()._dump_hram());
+
+		// println!("{:?}", self.ppu.lock().unwrap().show_video_buffer());
 	}
 }

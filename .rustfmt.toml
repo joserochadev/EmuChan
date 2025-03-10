@@ -4,4 +4,6 @@ fn_call_width = 80
 reorder_imports = true
 reorder_modules = true
 single_line_if_else_max_width = 60
- print_misformatted_file_names = true
+print_misformatted_file_names = true
+use_try_shorthand = true
+use_field_init_shorthand = true
