@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 pub const GAMEBOY_RESOLUTION: (i32, i32) = (160, 144);
 pub const SCREEN_SIZE: (i32, i32) =
 	(GAMEBOY_RESOLUTION.0 * SCREEN_SCALE, GAMEBOY_RESOLUTION.1 * SCREEN_SCALE);
