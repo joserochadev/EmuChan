@@ -191,7 +191,7 @@ pub fn disassemble(
 	for _ in 0..amount_of_instruction {
 		let (new_addr, instruction) = decode(addr, bytes, instructions);
 
-		println!("{:#02X} {}", addr, instruction);
+		println!("0x{:04X} {}", addr, instruction);
 		addr = new_addr;
 	}
 }
