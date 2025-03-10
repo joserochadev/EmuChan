@@ -11,6 +11,7 @@ This is a **hobby project** to learn Rust and explore hardware emulation. The go
 ✅ Rendering via PPU (in development)  
 ✅ Support for the GameBoy boot ROM (in development)  
 ✅ Compatibility with games and hardware tests (in development)
+✅ CLI to run the emulator, execute tests, or disassemble memory sections
 
 ## 📚 References
 
@@ -37,10 +38,39 @@ cd EmuChan
 cargo build --release
 ```
 
-3️⃣ **Run the emulator:**
+3️⃣ Run the CLI:
+
+The CLI allows you to:
+
+- Run the emulator
+- Execute a specific test
+- Disassemble a memory section
+
+**Run the emulator with a ROM:**
 
 ```sh
-cargo run --release
+cargo run --release -- run path/to/rom.gb
+```
+
+**Run a specific test from a JSON file:**
+
+```sh
+cargo run --release -- test path/to/test.json
+```
+
+**Disassemble a section of memory:**
+
+```sh
+cargo run --release -- disassembler 0x0000 256
+```
+
+(This disassembles 256 bytes starting at address 0x0000.)
+
+**Show help message:**
+
+```sh
+cargo run --release -- help
+
 ```
 
 ## 📌 Contributions
