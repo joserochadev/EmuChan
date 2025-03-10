@@ -9,19 +9,80 @@ use disassembler::{disassemble, parse_from_file};
 
 use tests::sm83::SM83;
 
+use clap::{Parser, Subcommand};
+
 use emuchan::EmuChan;
 
+#[derive(Parser)]
+#[command(
+	bin_name = "cargo run",
+	author = "joserochadev",
+	version = "0.1.0",
+	about = "EmuChan Emulator CLI",
+	long_about = "This CLI allows you to run the emulator, execute specific tests, or disassemble a memory section."
+)]
+struct CLI {
+	#[command(subcommand)]
+	command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+	/// Starts the emulator and runs the loaded ROM.
+	RUN,
+
+	/// Runs a specific test from a JSON file.
+	///
+	/// Example:
+	/// ```
+	/// cargo run -- test ./roms/json_test/0e.json
+	/// ```
+	TEST { path: String },
+
+	/// Disassembles a section of memory and prints the instructions.
+	///
+	/// Example:
+	/// ```
+	/// cargo run -- disassemble 0x100 256
+	/// ```
+	DISASSEMBLER {
+		/// Starting memory address (e.g., 0x100)
+		start: String,
+
+		/// Number of bytes to disassemble
+		length: usize,
+	},
+}
+
 fn main() {
-	// let mut sm83 = SM83::new();
-	// sm83.run_test("./roms/json_tests/0e.json".to_string());
-	// panic!("aa");
+	let cli = CLI::parse();
 
-	let instructions = parse_from_file("./src/disassembler/instructions.json");
+	match cli.command {
+		Commands::RUN => {
+			println!("🔄 Starting the emulator...");
+			let mut emuchan = EmuChan::new();
+			emuchan.run();
+		}
 
-	let mut emuchan = EmuChan::new();
-	disassemble(0x00, &emuchan.bus.memory, &instructions, 256);
-	emuchan.run();
+		Commands::TEST { path } => {
+			println!("🔬 Running test: {}", path);
+			let mut sm83 = SM83::new();
+			sm83.run_test(path);
+		}
 
-	// let mut emuchan = EmuChan::new();
-	// emuchan.run();
+		Commands::DISASSEMBLER { start, length } => {
+			let start_num = usize::from_str_radix(start.trim_start_matches("0x"), 16)
+				.expect("Invalid hexadecimal number");
+
+			println!("🛠 Disassembling memory from 0x{:X} to 0x{:X}...", start_num, start_num + length);
+
+			let start_addr = u16::from_str_radix(start.trim_start_matches("0x"), 16)
+				.expect("Invalid hexadecimal number");
+
+			let instructions = parse_from_file("./src/disassembler/instructions.json");
+
+			let emuchan = EmuChan::new();
+			disassemble(start_addr as usize, &emuchan.bus.memory, &instructions, length);
+		}
+	}
 }
