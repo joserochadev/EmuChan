@@ -183,9 +183,11 @@ impl CPU {
 
 	pub fn decode(&mut self, instruction: u8) -> Result<(), String> {
 		match instruction {
+			// NOP
 			0x00 => {
 				self.set_cycles(4);
 			}
+			// DEC B
 			0x05 => {
 				let before = self.reg.b;
 				let result = self.reg.b.wrapping_sub(1);
@@ -198,11 +200,13 @@ impl CPU {
 				self.set_flag(Flags::H, hc);
 				self.set_cycles(4);
 			}
+			// LD B, u8
 			0x06 => {
 				let data = self.fetch();
 				self.reg.b = data;
 				self.set_cycles(8);
 			}
+			// INC C
 			0x0C => {
 				let before = self.reg.c;
 				let result = self.reg.c.wrapping_add(1);
@@ -214,21 +218,25 @@ impl CPU {
 				self.set_flag(Flags::H, hc > 0xF);
 				self.set_cycles(4);
 			}
+			// LD C, u8
 			0x0E => {
 				let data = self.fetch();
 				self.reg.c = data;
 				self.set_cycles(8);
 			}
+			// LD (DE), A
 			0x11 => {
 				let data = self.fetch16();
 				self.reg.set_de(data);
 				self.set_cycles(12);
 			}
+			// INC DE
 			0x13 => {
 				let de = self.reg.get_de();
 				self.reg.set_de(de + 1);
 				self.set_cycles(8);
 			}
+			// RLA
 			0x17 => {
 				let carry = self.get_flag(Flags::C);
 				let bit_7 = (self.reg.a >> 7) & 0b1;
@@ -242,12 +250,14 @@ impl CPU {
 
 				self.set_cycles(4);
 			}
+			// LD A, (DE)
 			0x1A => {
 				let addr = self.reg.get_de();
 				let data = self.read(addr);
 				self.reg.a = data;
 				self.set_cycles(8);
 			}
+			// JR NZ, i8
 			0x20 => {
 				let data = self.fetch() as i8;
 				if self.get_flag(Flags::Z) == 1 {
@@ -256,11 +266,13 @@ impl CPU {
 				}
 				self.set_cycles(8);
 			}
+			// LD HL, u16
 			0x21 => {
 				let data = self.fetch16();
 				self.reg.set_hl(data);
 				self.set_cycles(12);
 			}
+			// LD (HL+), A
 			0x22 => {
 				let data = self.reg.a;
 				let addr = self.reg.get_hl();
@@ -268,16 +280,19 @@ impl CPU {
 				self.reg.set_hl(addr + 1);
 				self.set_cycles(8);
 			}
+			// INC HL
 			0x23 => {
 				let hl = self.reg.get_hl();
 				self.reg.set_hl(hl + 1);
 				self.set_cycles(8);
 			}
+			// LD SP, u16
 			0x31 => {
 				let data = self.fetch16();
 				self.reg.sp = data;
 				self.set_cycles(12);
 			}
+			// LD (HL-), A
 			0x32 => {
 				let addr = self.reg.get_hl();
 				let data = self.reg.a;
@@ -286,6 +301,7 @@ impl CPU {
 				self.reg.set_hl(addr - 1);
 				self.set_cycles(8);
 			}
+			// DEC A
 			0x3D => {
 				let before = self.reg.a;
 				let result = self.reg.a.wrapping_sub(1);
@@ -298,27 +314,32 @@ impl CPU {
 				self.set_flag(Flags::H, hc);
 				self.set_cycles(4);
 			}
+			// LD A, u8
 			0x3E => {
 				let data = self.fetch();
 				self.reg.a = data;
 				self.set_cycles(8);
 			}
+			// LD C, A
 			0x4F => {
 				let data = self.reg.a;
 				self.reg.c = data;
 				self.set_cycles(4);
 			}
+			// LD (HL), A
 			0x77 => {
 				let data = self.reg.a;
 				let addr = self.reg.get_hl();
 				self.write(addr, data);
 				self.set_cycles(8);
 			}
+			// LD A, E
 			0x7B => {
 				let e = self.reg.e;
 				self.reg.a = e;
 				self.set_cycles(4);
 			}
+			// XOR A, A
 			0xAF => {
 				let result = self.reg.a ^ self.reg.a;
 				self.reg.a = result;
@@ -329,25 +350,30 @@ impl CPU {
 				self.set_flag(Flags::C, false);
 				self.set_cycles(4);
 			}
+			// POP BC
 			0xC1 => {
 				let data = self.pop();
 				self.reg.set_bc(data);
 				self.set_cycles(12);
 			}
+			// PUSH BC
 			0xC5 => {
 				let data = self.reg.get_bc();
 				self.push(data);
 				self.set_cycles(16);
 			}
+			// RET
 			0xC9 => {
 				let addr = self.pop();
 				self.reg.pc = addr;
 				self.set_cycles(16);
 			}
+			// PREFIX CB
 			0xCB => {
 				let cb_intruction = self.fetch();
 
 				match cb_intruction {
+					// RL C
 					0x11 => {
 						let carry = self.get_flag(Flags::C);
 						let bit_7 = (self.reg.c >> 7) & 0b1;
@@ -361,6 +387,7 @@ impl CPU {
 
 						self.set_cycles(8);
 					}
+					// BIT 7, H
 					0x7C => {
 						let bit_7_h = (self.reg.h >> 7) & 0b1;
 
@@ -372,12 +399,14 @@ impl CPU {
 					_ => return Err(format!("Unknow CB instruction. OPCODE: {:02X}", cb_intruction)),
 				}
 			}
+			// CALL u16
 			0xCD => {
 				let nn = self.fetch16();
 				self.push(self.reg.pc);
 				self.reg.pc = nn;
 				self.set_cycles(24);
 			}
+			// LD (FF00+u8), A
 			0xE0 => {
 				let hi = (0xFF << 8) as u16;
 				let lo = self.fetch() as u16;
@@ -386,6 +415,7 @@ impl CPU {
 				self.write(addr, data);
 				self.set_cycles(12);
 			}
+			// LD (FF00+C), A
 			0xE2 => {
 				let hi = (0xFF << 8) as u16;
 				let lo = self.reg.c as u16;
@@ -393,11 +423,13 @@ impl CPU {
 				self.write(addr, self.reg.a);
 				self.set_cycles(8);
 			}
+			// LD (u16), A
 			0xEA => {
 				let addr = self.fetch16();
 				self.write(addr, self.reg.a);
 				self.set_cycles(16);
 			}
+			// CP A, u8
 			0xFE => {
 				let before = self.reg.a;
 				let n = self.fetch();
