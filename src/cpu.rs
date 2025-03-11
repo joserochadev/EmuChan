@@ -260,11 +260,12 @@ impl CPU {
 			// JR NZ, i8
 			0x20 => {
 				let data = self.fetch() as i8;
-				if self.get_flag(Flags::Z) == 1 {
+				if self.get_flag(Flags::Z) == 0 {
 					self.reg.pc = self.reg.pc.wrapping_add(data as u16);
 					self.set_cycles(12);
+				} else {
+					self.set_cycles(8);
 				}
-				self.set_cycles(8);
 			}
 			// LD HL, u16
 			0x21 => {
