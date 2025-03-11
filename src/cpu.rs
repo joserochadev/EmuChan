@@ -154,7 +154,7 @@ impl CPU {
 	pub fn fetch16(&mut self) -> u16 {
 		let lo = self.read(self.reg.pc);
 		let hi = self.read(self.reg.pc + 1);
-		self.reg.pc += 2;
+		self.reg.pc = self.reg.pc.wrapping_add(2);
 		let data = ((hi as u16) << 8) | lo as u16;
 		data
 	}
