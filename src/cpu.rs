@@ -287,6 +287,16 @@ impl CPU {
 				self.reg.set_hl(hl + 1);
 				self.set_cycles(8);
 			}
+			// JR Z, i8
+			0x28 => {
+				let data = self.fetch() as i8;
+				if self.get_flag(Flags::Z) == 1 {
+					self.reg.pc = self.reg.pc.wrapping_add(data as u16);
+					self.set_cycles(12);
+				} else {
+					self.set_cycles(8);
+				}
+			}
 			// LD SP, u16
 			0x31 => {
 				let data = self.fetch16();
