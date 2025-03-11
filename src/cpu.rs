@@ -218,6 +218,19 @@ impl CPU {
 				self.set_flag(Flags::H, hc > 0xF);
 				self.set_cycles(4);
 			}
+			// DEC C
+			0x0D => {
+				let before = self.reg.c;
+				let result = self.reg.c.wrapping_sub(1);
+				self.reg.c = result;
+
+				let hc = (before & 0xF) < 1;
+
+				self.set_flag(Flags::Z, result == 0);
+				self.set_flag(Flags::N, true);
+				self.set_flag(Flags::H, hc);
+				self.set_cycles(4);
+			}
 			// LD C, u8
 			0x0E => {
 				let data = self.fetch();
@@ -402,7 +415,7 @@ impl CPU {
 					0x7C => {
 						let bit_7_h = (self.reg.h >> 7) & 0b1;
 
-						self.set_flag(Flags::Z, bit_7_h == 1);
+						self.set_flag(Flags::Z, bit_7_h == 0);
 						self.set_flag(Flags::N, false);
 						self.set_flag(Flags::H, true);
 						self.set_cycles(8);
@@ -444,15 +457,17 @@ impl CPU {
 			0xFE => {
 				let before = self.reg.a;
 				let n = self.fetch();
-				let a = self.reg.a;
-				let result = a.wrapping_sub(n);
-				let hc = (before & 0xF) < 1;
-				let bit_7 = (result >> 7) & 0b1;
+				let result = before.wrapping_sub(n);
+
+				let hc = (before & 0xF) < (n & 0xF);
+				let c = before < n;
 
 				self.set_flag(Flags::Z, result == 0);
 				self.set_flag(Flags::N, true);
 				self.set_flag(Flags::H, hc);
-				self.set_flag(Flags::C, bit_7 == 1);
+				self.set_flag(Flags::C, c);
+
+				self.set_cycles(8);
 			}
 			_ => return Err(format!("Unknow instruction. OPCODE: {:02X}", instruction)),
 		}
