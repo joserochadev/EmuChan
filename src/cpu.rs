@@ -381,6 +381,11 @@ impl CPU {
 				self.write(addr, self.reg.a);
 				self.set_cycles(8);
 			}
+			0xEA => {
+				let addr = self.fetch16();
+				self.write(addr, self.reg.a);
+				self.set_cycles(16);
+			}
 			0xFE => {
 				let before = self.reg.a;
 				let n = self.fetch();
