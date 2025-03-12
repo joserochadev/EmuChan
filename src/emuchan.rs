@@ -40,6 +40,9 @@ impl EmuChan {
 		bus.memory[0..=255].copy_from_slice(&BOOT_DMG);
 		bus.memory[0x104..=0x133].copy_from_slice(&NINTENDO_LOGO);
 
+		// Simulating v-blank period
+		bus.write(0xff44, 0x90);
+
 		Self {
 			bus,
 			cpu,
