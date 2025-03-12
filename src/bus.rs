@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+use log::debug;
 
 /*
 +-------+-------+---------------------------------+-----------------------------------------------------+
@@ -35,111 +36,126 @@ impl BUS {
 	pub fn read(&self, addr: u16) -> u8 {
 		if addr < 0x8000 {
 			// Cartridge ROM
+			debug!("Accessing Cartridge ROM at 0x{:04X}", addr);
 			return self.memory[addr as usize];
 		}
-		
+
 		if addr < 0xA000 {
 			// VRAM
+			debug!("Accessing VRAM at 0x{:04X}", addr);
 			return self.memory[addr as usize];
 		}
 
 		if addr < 0xC000 {
 			// External RAM
+			debug!("Accessing External RAM at 0x{:04X}", addr);
 			return self.memory[addr as usize];
 		}
-		
+
 		if addr < 0xE000 {
 			// WRAM
+			debug!("Accessing WRAM at 0x{:04X}", addr);
 			return self.memory[addr as usize];
 		}
-		
+
 		if addr < 0xFE00 {
 			// Echo RAM
+			debug!("Accessing Echo RAM at 0x{:04X}", addr);
 			return self.memory[addr as usize];
 		}
-		
+
 		if addr < 0xFEA0 {
 			// OAM
+			debug!("Accessing OAM at 0x{:04X}", addr);
 			return self.memory[addr as usize];
 		}
-		
+
 		if addr < 0xFF00 {
 			// Not Usable
+			debug!("Accessing Not Usable memory at 0x{:04X}", addr);
 			return self.memory[addr as usize];
 		}
-		
+
 		if addr < 0xFF80 {
 			// I/O Registers
+			debug!("Accessing I/O Registers at 0x{:04X}", addr);
 			return self.memory[addr as usize];
 		}
 
 		if addr < 0xFFFF {
 			// HRAM
+			debug!("Accessing HRAM at 0x{:04X}", addr);
 			return self.memory[addr as usize];
 		}
-		
+
 		if addr == 0xFFFF {
 			// Interrupt Enable register (IE)
+			debug!("Accessing Interrupt Enable register at 0x{:04X}", addr);
 			return self.memory[addr as usize];
 		}
-		
-
 
 		self.memory[addr as usize]
 	}
 
 	pub fn write(&mut self, addr: u16, data: u8) {
-
 		if addr < 0x8000 {
 			// Cartridge ROM
+			debug!("Writing to Cartridge ROM at 0x{:04X}", addr);
 			self.memory[addr as usize] = data;
 		}
-		
+
 		if addr < 0xA000 {
 			// VRAM
+			debug!("Writing to VRAM at 0x{:04X}", addr);
 			self.memory[addr as usize] = data;
 		}
 
 		if addr < 0xC000 {
 			// External RAM
+			debug!("Writing to External RAM at 0x{:04X}", addr);
 			self.memory[addr as usize] = data;
 		}
-		
+
 		if addr < 0xE000 {
 			// WRAM
+			debug!("Writing to WRAM at 0x{:04X}", addr);
 			self.memory[addr as usize] = data;
 		}
-		
+
 		if addr < 0xFE00 {
 			// Echo RAM
+			debug!("Writing to Echo RAM at 0x{:04X}", addr);
 			self.memory[addr as usize] = data;
 		}
-		
+
 		if addr < 0xFEA0 {
 			// OAM
+			debug!("Writing to OAM at 0x{:04X}", addr);
 			self.memory[addr as usize] = data;
 		}
-		
+
 		if addr < 0xFF00 {
 			// Not Usable
+			debug!("Writing to Not Usable memory at 0x{:04X}", addr);
 			self.memory[addr as usize] = data;
 		}
-		
+
 		if addr < 0xFF80 {
 			// I/O Registers
+			debug!("Writing to I/O Registers at 0x{:04X}", addr);
 			self.memory[addr as usize] = data;
 		}
 
 		if addr < 0xFFFF {
 			// HRAM
+			debug!("Writing to HRAM at 0x{:04X}", addr);
 			self.memory[addr as usize] = data;
 		}
-		
+
 		if addr == 0xFFFF {
 			// Interrupt Enable register (IE)
+			debug!("Writing to Interrupt Enable register at 0x{:04X}", addr);
 			self.memory[addr as usize] = data;
 		}
-		
-
 	}
 }

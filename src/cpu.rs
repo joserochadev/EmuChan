@@ -320,7 +320,7 @@ impl CPU {
 				self.set_flag(Flags::H, hc);
 				self.set_cycles(4);
 			}
-			// LD E, u8 
+			// LD E, u8
 			0x1E => {
 				let data = self.fetch();
 				self.reg.e = data;
@@ -500,7 +500,6 @@ impl CPU {
 				self.set_flag(Flags::C, a < b);
 
 				self.set_cycles(4);
-
 			}
 			// XOR A, A
 			0xAF => {
@@ -529,7 +528,6 @@ impl CPU {
 				self.set_flag(Flags::C, c);
 
 				self.set_cycles(8);
-
 			}
 			// POP BC
 			0xC1 => {

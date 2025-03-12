@@ -10,6 +10,8 @@ use disassembler::{disassemble, parse_from_file};
 use tests::sm83::SM83;
 
 use clap::{Parser, Subcommand};
+use env_logger;
+use std::env;
 
 use emuchan::EmuChan;
 
@@ -55,6 +57,10 @@ enum Commands {
 }
 
 fn main() {
+	env::set_var("RUST_LOG", "trace"); // defice RUST_LOG env
+
+	env_logger::init(); // Initialize logger
+
 	let cli = CLI::parse();
 
 	match cli.command {
