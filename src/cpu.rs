@@ -362,6 +362,12 @@ impl CPU {
 				self.reg.c = data;
 				self.set_cycles(4);
 			}
+			// LD D, A
+			0x57 => {
+				let data = self.reg.a;
+				self.reg.d = data;
+				self.set_cycles(4);
+			}
 			// LD H, A
 			0x67 => {
 				let data = self.reg.a;
