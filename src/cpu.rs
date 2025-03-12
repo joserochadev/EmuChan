@@ -263,6 +263,12 @@ impl CPU {
 
 				self.set_cycles(4);
 			}
+			// JR i8
+			0x18 => {
+				let data = self.fetch() as i8;
+				self.reg.pc = self.reg.pc.wrapping_add(data as u16);
+				self.set_cycles(12);
+			}
 			// LD A, (DE)
 			0x1A => {
 				let addr = self.reg.get_de();
