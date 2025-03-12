@@ -288,6 +288,19 @@ impl CPU {
 				self.reg.a = data;
 				self.set_cycles(8);
 			}
+			// DEC E
+			0x1D => {
+				let before = self.reg.e;
+				let result = self.reg.e.wrapping_sub(1);
+				self.reg.e = result;
+
+				let hc = (before & 0xF) < 1;
+
+				self.set_flag(Flags::Z, result == 0);
+				self.set_flag(Flags::N, true);
+				self.set_flag(Flags::H, hc);
+				self.set_cycles(4);
+			}
 			// LD E, u8 
 			0x1E => {
 				let data = self.fetch();
