@@ -274,6 +274,12 @@ impl CPU {
 				self.set_flag(Flags::H, hc);
 				self.set_cycles(4);
 			}
+			// LD D, u8
+			0x16 => {
+				let data = self.fetch();
+				self.reg.d = data;
+				self.set_cycles(8);
+			}
 			// RLA
 			0x17 => {
 				let carry = self.get_flag(Flags::C);
