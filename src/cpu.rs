@@ -261,6 +261,19 @@ impl CPU {
 				self.reg.set_de(de + 1);
 				self.set_cycles(8);
 			}
+			// DEC D
+			0x15 => {
+				let before = self.reg.d;
+				let result = self.reg.d.wrapping_sub(1);
+				self.reg.d = result;
+
+				let hc = (before & 0xF) < 1;
+
+				self.set_flag(Flags::Z, result == 0);
+				self.set_flag(Flags::N, true);
+				self.set_flag(Flags::H, hc);
+				self.set_cycles(4);
+			}
 			// RLA
 			0x17 => {
 				let carry = self.get_flag(Flags::C);
