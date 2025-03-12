@@ -430,6 +430,12 @@ impl CPU {
 				self.reg.a = e;
 				self.set_cycles(4);
 			}
+			// LD A, H
+			0x7C => {
+				let h = self.reg.h;
+				self.reg.a = h;
+				self.set_cycles(4);
+			}
 			// XOR A, A
 			0xAF => {
 				let result = self.reg.a ^ self.reg.a;
