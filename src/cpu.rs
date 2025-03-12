@@ -443,6 +443,12 @@ impl CPU {
 				self.write(addr, data);
 				self.set_cycles(8);
 			}
+			// LD A, B
+			0x78 => {
+				let b = self.reg.b;
+				self.reg.a = b;
+				self.set_cycles(4);
+			}
 			// LD A, E
 			0x7B => {
 				let e = self.reg.e;
