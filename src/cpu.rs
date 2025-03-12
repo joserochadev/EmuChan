@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use std::{fmt, fs::read};
+use std::fmt;
 
 use crate::bus::BUS;
 
@@ -453,6 +453,12 @@ impl CPU {
 			0x7C => {
 				let h = self.reg.h;
 				self.reg.a = h;
+				self.set_cycles(4);
+			}
+			// LD A, L
+			0x7D => {
+				let l = self.reg.l;
+				self.reg.a = l;
 				self.set_cycles(4);
 			}
 			// SUB A, B
