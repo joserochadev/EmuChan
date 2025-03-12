@@ -288,6 +288,12 @@ impl CPU {
 				self.reg.a = data;
 				self.set_cycles(8);
 			}
+			// LD E, u8 
+			0x1E => {
+				let data = self.fetch();
+				self.reg.e = data;
+				self.set_cycles(8);
+			}
 			// JR NZ, i8
 			0x20 => {
 				let data = self.fetch() as i8;
