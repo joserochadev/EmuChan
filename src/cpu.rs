@@ -310,6 +310,12 @@ impl CPU {
 					self.set_cycles(8);
 				}
 			}
+			// LD L, u8
+			0x2E => {
+				let data = self.fetch();
+				self.reg.l = data;
+				self.set_cycles(8);
+			}
 			// LD SP, u16
 			0x31 => {
 				let data = self.fetch16();
