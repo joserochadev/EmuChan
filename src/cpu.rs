@@ -467,6 +467,24 @@ impl CPU {
 				self.reg.a = l;
 				self.set_cycles(4);
 			}
+			// ADD A, (HL)
+			0x86 => {
+				let addr = self.reg.get_hl();
+				let data = self.read(addr);
+				let a = self.reg.a;
+				let result = a.wrapping_add(data);
+				self.reg.a = result;
+
+				let hc = ((a & 0xF) + (data & 0xF)) > 0xF;
+				let c = (a as u16 + data as u16) > 0xFF;
+
+				self.set_flag(Flags::Z, result == 0);
+				self.set_flag(Flags::N, false);
+				self.set_flag(Flags::H, hc);
+				self.set_flag(Flags::C, c);
+
+				self.set_cycles(8);
+			}
 			// SUB A, B
 			0x90 => {
 				let b = self.reg.b;
