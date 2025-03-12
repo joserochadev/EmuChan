@@ -337,6 +337,18 @@ impl CPU {
 				self.reg.set_hl(hl + 1);
 				self.set_cycles(8);
 			}
+			// INC H
+			0x24 => {
+				let before = self.reg.h;
+				let result = self.reg.h.wrapping_add(1);
+				self.reg.h = result;
+				let hc = (before & 0xF) + (1 & 0xF);
+
+				self.set_flag(Flags::Z, result == 0);
+				self.set_flag(Flags::N, false);
+				self.set_flag(Flags::H, hc > 0xF);
+				self.set_cycles(4);
+			}
 			// JR Z, i8
 			0x28 => {
 				let data = self.fetch() as i8;
