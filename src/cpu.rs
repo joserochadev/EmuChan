@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use std::fmt;
+use std::{fmt, fs::read};
 
 use crate::bus::BUS;
 
@@ -482,6 +482,24 @@ impl CPU {
 				self.set_flag(Flags::H, false);
 				self.set_flag(Flags::C, false);
 				self.set_cycles(4);
+			}
+			// CP A, (HL)
+			0xBE => {
+				let addr = self.reg.get_hl();
+				let data = self.read(addr);
+				let a = self.reg.a;
+				let result = a.wrapping_sub(data);
+
+				let hc = (a & 0xF) < (data & 0xF);
+				let c = a < data;
+
+				self.set_flag(Flags::Z, result == 0);
+				self.set_flag(Flags::N, true);
+				self.set_flag(Flags::H, hc);
+				self.set_flag(Flags::C, c);
+
+				self.set_cycles(8);
+
 			}
 			// POP BC
 			0xC1 => {
