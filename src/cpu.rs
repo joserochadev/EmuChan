@@ -187,6 +187,18 @@ impl CPU {
 			0x00 => {
 				self.set_cycles(4);
 			}
+			// INC B
+			0x04 => {
+				let before = self.reg.b;
+				let result = self.reg.b.wrapping_add(1);
+				self.reg.b = result;
+				let hc = (before & 0xF) + (1 & 0xF);
+
+				self.set_flag(Flags::Z, result == 0);
+				self.set_flag(Flags::N, false);
+				self.set_flag(Flags::H, hc > 0xF);
+				self.set_cycles(4);
+			}
 			// DEC B
 			0x05 => {
 				let before = self.reg.b;
