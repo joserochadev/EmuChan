@@ -436,6 +436,23 @@ impl CPU {
 				self.reg.a = h;
 				self.set_cycles(4);
 			}
+			// SUB A, B
+			0x90 => {
+				let b = self.reg.b;
+				let a = self.reg.a;
+				let result = a.wrapping_sub(b);
+				self.reg.a = result;
+
+				let hc = (a & 0xF) < (b & 0xF);
+
+				self.set_flag(Flags::Z, result == 0);
+				self.set_flag(Flags::N, true);
+				self.set_flag(Flags::H, hc);
+				self.set_flag(Flags::C, a < b);
+
+				self.set_cycles(4);
+
+			}
 			// XOR A, A
 			0xAF => {
 				let result = self.reg.a ^ self.reg.a;
