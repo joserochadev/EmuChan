@@ -495,6 +495,13 @@ impl CPU {
 				self.write(addr, self.reg.a);
 				self.set_cycles(16);
 			}
+			// LD A, (FF00+u8)
+			0xF0 => {
+				let data = self.fetch();
+				let addr = ((0xFF << 8) as u16) | data as u16;
+				self.reg.a = self.read(addr);
+				self.set_cycles(12);
+			}
 			// CP A, u8
 			0xFE => {
 				let before = self.reg.a;
