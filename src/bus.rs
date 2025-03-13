@@ -1,6 +1,10 @@
 #![allow(dead_code)]
 use log::debug;
 
+use std::ptr::null_mut;
+
+use crate::cartridge::Cartridge;
+
 /*
 +-------+-------+---------------------------------+-----------------------------------------------------+
 | Start | End   | Description                 		| Notes                                     					|
@@ -24,20 +28,30 @@ use log::debug;
 #[derive(Debug, Clone)]
 pub struct BUS {
 	pub memory: [u8; 0x10000], // address 0 to 0xffff
+	pub cartridge: *mut Cartridge,
+	pub disable_boot: bool,
 }
 
 impl BUS {
 	pub fn new() -> BUS {
 		BUS {
 			memory: [0; 0x10000],
+			cartridge: null_mut(),
+			disable_boot: false,
 		}
 	}
 
 	pub fn read(&self, addr: u16) -> u8 {
+		if addr < 0x100 && self.disable_boot == false {
+			// Boot
+			return self.memory[addr as usize];
+		}
+
 		if addr < 0x8000 {
 			// Cartridge ROM
-			debug!("Accessing Cartridge ROM at 0x{:04X}", addr);
-			return self.memory[addr as usize];
+			unsafe {
+				return (*self.cartridge).read(addr);
+			}
 		}
 
 		if addr < 0xA000 {
@@ -98,64 +112,92 @@ impl BUS {
 	}
 
 	pub fn write(&mut self, addr: u16, data: u8) {
+		if addr < 0x100 {
+			// BOOT
+			self.memory[addr as usize] = data;
+			return;
+		}
+
 		if addr < 0x8000 {
 			// Cartridge ROM
-			debug!("Writing to Cartridge ROM at 0x{:04X}", addr);
-			self.memory[addr as usize] = data;
+			unsafe {
+				(*self.cartridge).write(addr, data);
+				return;
+			}
 		}
 
 		if addr < 0xA000 {
 			// VRAM
 			debug!("Writing to VRAM at 0x{:04X}", addr);
 			self.memory[addr as usize] = data;
+			return;
 		}
 
 		if addr < 0xC000 {
 			// External RAM
 			debug!("Writing to External RAM at 0x{:04X}", addr);
 			self.memory[addr as usize] = data;
+			return;
 		}
 
 		if addr < 0xE000 {
 			// WRAM
 			debug!("Writing to WRAM at 0x{:04X}", addr);
 			self.memory[addr as usize] = data;
+			return;
 		}
 
 		if addr < 0xFE00 {
 			// Echo RAM
 			debug!("Writing to Echo RAM at 0x{:04X}", addr);
 			self.memory[addr as usize] = data;
+			return;
 		}
 
 		if addr < 0xFEA0 {
 			// OAM
 			debug!("Writing to OAM at 0x{:04X}", addr);
 			self.memory[addr as usize] = data;
+			return;
 		}
 
 		if addr < 0xFF00 {
 			// Not Usable
 			debug!("Writing to Not Usable memory at 0x{:04X}", addr);
 			self.memory[addr as usize] = data;
+			return;
 		}
 
 		if addr < 0xFF80 {
+			// Disable Boot
+			if addr == 0xFF50 && self.disable_boot == false {
+				self.memory[addr as usize] = data;
+				self.disable_boot = true;
+				debug!("Boot Rom Disabled.");
+				return;
+			}
 			// I/O Registers
 			debug!("Writing to I/O Registers at 0x{:04X}", addr);
 			self.memory[addr as usize] = data;
+			return;
 		}
 
 		if addr < 0xFFFF {
 			// HRAM
 			debug!("Writing to HRAM at 0x{:04X}", addr);
 			self.memory[addr as usize] = data;
+			return;
 		}
 
 		if addr == 0xFFFF {
 			// Interrupt Enable register (IE)
 			debug!("Writing to Interrupt Enable register at 0x{:04X}", addr);
 			self.memory[addr as usize] = data;
+			return;
 		}
+	}
+
+	pub fn cartridge_connect(&mut self, cart: &mut Cartridge) {
+		self.cartridge = cart;
 	}
 }
