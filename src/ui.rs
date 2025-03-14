@@ -4,7 +4,7 @@ use sdl2::{event::Event, pixels::Color, rect::Rect};
 
 pub struct UI {
 	_context: sdl2::Sdl,
-	_main_window: sdl2::video::Window,
+	pub main_window: sdl2::video::Window,
 	_debug_window: sdl2::video::Window,
 	main_canvas: sdl2::render::Canvas<sdl2::video::Window>,
 	debug_canvas: sdl2::render::Canvas<sdl2::video::Window>,
@@ -62,7 +62,7 @@ impl UI {
 
 		Self {
 			_context: context,
-			_main_window: main_window,
+			main_window,
 			_debug_window: debug_window,
 			main_canvas,
 			debug_canvas,

@@ -11,11 +11,15 @@ use crate::utils::rom_size::get_rom_size;
 #[derive(Debug)]
 pub struct Cartridge {
 	pub rom: Vec<u8>,
+	pub game_title: String,
 }
 
 impl Cartridge {
 	pub fn new() -> Self {
-		Self { rom: Vec::new() }
+		Self {
+			rom: Vec::new(),
+			game_title: String::new(),
+		}
 	}
 
 	pub fn load_rom(&mut self, rom_path: String) {
@@ -34,12 +38,12 @@ impl Cartridge {
 		debug!("ROM Read Successfully!");
 
 		// Game Title
-		let title = String::from_utf8_lossy(&self.rom[0x134..=0x143]);
-		info!("Game Title: {}", title);
+		self.game_title = String::from_utf8_lossy(&self.rom[0x134..=0x143]).to_string();
+		info!("Game Title: {}", self.game_title);
 
 		// Game Version
-		let game_version = &self.rom[0x14C];
-		info!("Game Version: {}.0", *game_version);
+		let game_version = self.rom[0x14C].clone().to_string();
+		info!("Game Version: {}.0", game_version);
 
 		// Licensee Codes
 		let licensee_code = &self.rom[0x14b];

@@ -45,15 +45,28 @@ impl EmuChan {
 		let cartridge = Arc::new(Mutex::new(Cartridge::new()));
 		let emulation_state = Arc::new(Mutex::new(EmulationState::RUNNING));
 
+		let mut ui = UI::new();
+
 		bus
 			.lock()
 			.unwrap()
 			.cartridge_connect(Arc::clone(&cartridge));
 
-		cartridge
-			.lock()
-			.unwrap()
-			.load_rom("./roms/games/tetris.gb".to_string());
+		{
+			let mut cart = cartridge.lock().unwrap();
+
+			// Load ROM
+			cart.load_rom("./roms/games/pokemon.gb".to_string());
+
+			// Remove null bytes
+			let game_title = cart.game_title.trim_end_matches('\0');
+
+			let new_window_title = format!("EmuChan - {}", game_title);
+			println!("{}", new_window_title);
+
+			// Set window title with game name
+			ui.main_window.set_title(&new_window_title).unwrap();
+		}
 
 		bus.lock().unwrap().memory[0..=255].copy_from_slice(&BOOT_DMG);
 
@@ -64,7 +77,7 @@ impl EmuChan {
 			bus,
 			cpu,
 			cartridge,
-			ui: UI::new(),
+			ui,
 			emulation_state,
 		}
 	}
