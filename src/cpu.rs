@@ -1,5 +1,8 @@
 #![allow(dead_code)]
-use std::fmt;
+use std::{
+	fmt,
+	sync::{Arc, Mutex},
+};
 
 use crate::bus::BUS;
 
@@ -69,12 +72,12 @@ impl Register {
 #[derive(Debug)]
 pub struct CPU {
 	pub reg: Register,
-	bus: *mut BUS,
+	bus: Arc<Mutex<BUS>>,
 	pub cycles: usize,
 }
 
 impl CPU {
-	pub fn new(bus: &mut BUS) -> CPU {
+	pub fn new(bus: Arc<Mutex<BUS>>) -> CPU {
 		CPU {
 			reg: Register::new(),
 			bus,
@@ -87,17 +90,17 @@ impl CPU {
 	// }
 
 	pub fn read(&mut self, addr: u16) -> u8 {
-		// let bus = self.bus.lock().unwrap();
-		// bus.read(addr)
-		unsafe { (*self.bus).read(addr) }
+		let bus = self.bus.lock().unwrap();
+		bus.read(addr)
+		// unsafe { (*self.bus).read(addr) }
 	}
 
 	pub fn write(&mut self, addr: u16, data: u8) {
-		// let mut bus = self.bus.lock().unwrap();
-		// bus.write(addr, data);
-		unsafe {
-			(*self.bus).write(addr, data);
-		}
+		let mut bus = self.bus.lock().unwrap();
+		bus.write(addr, data);
+		// unsafe {
+		// 	(*self.bus).write(addr, data);
+		// }
 	}
 
 	pub fn view_memory_at(&self, memory: &[u8], address: usize, n: usize) {

@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use log::debug;
 
-use std::ptr::null_mut;
+use std::sync::{Arc, Mutex};
 
 use crate::cartridge::Cartridge;
 
@@ -28,7 +28,7 @@ use crate::cartridge::Cartridge;
 #[derive(Debug, Clone)]
 pub struct BUS {
 	pub memory: [u8; 0x10000], // address 0 to 0xffff
-	pub cartridge: *mut Cartridge,
+	pub cartridge: Option<Arc<Mutex<Cartridge>>>,
 	pub disable_boot: bool,
 }
 
@@ -36,7 +36,7 @@ impl BUS {
 	pub fn new() -> BUS {
 		BUS {
 			memory: [0; 0x10000],
-			cartridge: null_mut(),
+			cartridge: None,
 			disable_boot: false,
 		}
 	}
@@ -49,8 +49,10 @@ impl BUS {
 
 		if addr < 0x8000 {
 			// Cartridge ROM
-			unsafe {
-				return (*self.cartridge).read(addr);
+
+			if let Some(cart) = &self.cartridge {
+				let cart = cart.lock().unwrap();
+				return cart.read(addr);
 			}
 		}
 
@@ -120,8 +122,10 @@ impl BUS {
 
 		if addr < 0x8000 {
 			// Cartridge ROM
-			unsafe {
-				(*self.cartridge).write(addr, data);
+
+			if let Some(cart) = &self.cartridge {
+				let mut cart = cart.lock().unwrap();
+				cart.write(addr, data);
 				return;
 			}
 		}
@@ -197,7 +201,7 @@ impl BUS {
 		}
 	}
 
-	pub fn cartridge_connect(&mut self, cart: &mut Cartridge) {
-		self.cartridge = cart;
+	pub fn cartridge_connect(&mut self, cart: Arc<Mutex<Cartridge>>) {
+		self.cartridge = Some(cart);
 	}
 }

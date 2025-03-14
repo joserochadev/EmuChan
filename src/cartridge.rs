@@ -8,6 +8,7 @@ use crate::utils::licensee_codes::{get_old_publisher, get_publisher};
 use crate::utils::ram_size::get_ram_size;
 use crate::utils::rom_size::get_rom_size;
 
+#[derive(Debug)]
 pub struct Cartridge {
 	pub rom: Vec<u8>,
 }

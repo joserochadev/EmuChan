@@ -4,6 +4,7 @@ mod cpu;
 mod disassembler;
 mod emuchan;
 mod tests;
+mod ui;
 mod utils;
 
 use disassembler::{disassemble, parse_from_file};
@@ -89,7 +90,7 @@ fn main() {
 			let instructions = parse_from_file("./src/disassembler/instructions.json");
 
 			let emuchan = EmuChan::new();
-			disassemble(start_addr as usize, &emuchan.bus.memory, &instructions, length);
+			disassemble(start_addr as usize, &emuchan.bus.lock().unwrap().memory, &instructions, length);
 		}
 	}
 }

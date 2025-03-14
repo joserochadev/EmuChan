@@ -2,7 +2,11 @@
 use crate::bus::BUS;
 use crate::cartridge::Cartridge;
 use crate::cpu::{Register, CPU};
+use crate::ui::UI;
 use crate::utils::boot::BOOT_DMG;
+
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 #[derive(Default, Clone, PartialEq)]
 pub enum EmulationState {
@@ -27,41 +31,58 @@ pub struct EmuState {
 }
 
 pub struct EmuChan {
-	pub bus: BUS,
-	pub cpu: CPU,
-	pub cartridge: Cartridge,
-	pub emulation_state: EmulationState,
+	pub bus: Arc<Mutex<BUS>>,
+	pub cpu: Arc<Mutex<CPU>>,
+	pub cartridge: Arc<Mutex<Cartridge>>,
+	pub ui: UI,
+	pub emulation_state: Arc<Mutex<EmulationState>>,
 }
 
 impl EmuChan {
 	pub fn new() -> Self {
-		let mut bus = BUS::new();
-		let cpu = CPU::new(&mut bus);
-		let mut cartridge = Cartridge::new();
-		let emulation_state = EmulationState::RUNNING;
+		let bus = Arc::new(Mutex::new(BUS::new()));
+		let cpu = Arc::new(Mutex::new(CPU::new(Arc::clone(&bus))));
+		let cartridge = Arc::new(Mutex::new(Cartridge::new()));
+		let emulation_state = Arc::new(Mutex::new(EmulationState::RUNNING));
 
-		bus.cartridge_connect(&mut cartridge);
+		bus
+			.lock()
+			.unwrap()
+			.cartridge_connect(Arc::clone(&cartridge));
 
-		cartridge.load_rom("./roms/games/tetris.gb".to_string());
+		cartridge
+			.lock()
+			.unwrap()
+			.load_rom("./roms/games/tetris.gb".to_string());
 
-		bus.memory[0..=255].copy_from_slice(&BOOT_DMG);
+		bus.lock().unwrap().memory[0..=255].copy_from_slice(&BOOT_DMG);
 
 		// Simulating v-blank period
-		bus.write(0xff44, 0x90);
+		bus.lock().unwrap().write(0xff44, 0x90);
 
 		Self {
 			bus,
 			cpu,
 			cartridge,
+			ui: UI::new(),
 			emulation_state,
 		}
 	}
 
 	pub fn run(&mut self) {
-		while self.emulation_state == EmulationState::RUNNING {
-			if let Err(e) = self.cpu.step() {
-				panic!("{}\n{}", e, self.cpu);
+		let cpu_clone = Arc::clone(&self.cpu);
+		let emulation_state_clone = Arc::clone(&self.emulation_state);
+
+		thread::spawn(move || {
+			let mut cpu = cpu_clone.lock().unwrap();
+
+			while *emulation_state_clone.lock().unwrap() == EmulationState::RUNNING {
+				if let Err(e) = cpu.step() {
+					panic!("{}\n{}", e, cpu);
+				}
 			}
-		}
+		});
+
+		self.ui.run();
 	}
 }

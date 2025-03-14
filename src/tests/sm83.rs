@@ -3,6 +3,7 @@ use serde::Deserialize;
 use std::fmt;
 use std::fs::File;
 use std::io::BufReader;
+use std::sync::{Arc, Mutex};
 
 use crate::bus::BUS;
 use crate::cpu::CPU;
@@ -88,14 +89,14 @@ impl fmt::Display for Snapshot {
 }
 
 pub struct SM83 {
-	_bus: BUS,
+	_bus: Arc<Mutex<BUS>>,
 	cpu: CPU,
 }
 
 impl SM83 {
 	pub fn new() -> Self {
-		let mut bus = BUS::new();
-		let cpu = CPU::new(&mut bus);
+		let bus = Arc::new(Mutex::new(BUS::new()));
+		let cpu = CPU::new(Arc::clone(&bus));
 
 		Self { _bus: bus, cpu }
 	}
