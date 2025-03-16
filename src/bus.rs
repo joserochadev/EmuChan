@@ -3,7 +3,7 @@ use log::debug;
 
 use std::sync::{Arc, Mutex};
 
-use crate::cartridge::Cartridge;
+use crate::{cartridge::Cartridge, ppu::PPU};
 
 /*
 +-------+-------+---------------------------------+-----------------------------------------------------+
@@ -29,6 +29,7 @@ use crate::cartridge::Cartridge;
 pub struct BUS {
 	pub memory: [u8; 0x10000], // address 0 to 0xffff
 	pub cartridge: Option<Arc<Mutex<Cartridge>>>,
+	pub ppu: Option<Arc<Mutex<PPU>>>,
 	pub disable_boot: bool,
 }
 
@@ -37,6 +38,7 @@ impl BUS {
 		BUS {
 			memory: [0; 0x10000],
 			cartridge: None,
+			ppu: None,
 			disable_boot: false,
 		}
 	}
@@ -58,8 +60,10 @@ impl BUS {
 
 		if addr < 0xA000 {
 			// VRAM
-			debug!("Accessing VRAM at 0x{:04X}", addr);
-			return self.memory[addr as usize];
+			if let Some(ppu) = &self.ppu {
+				let ppu = ppu.lock().unwrap();
+				return ppu.read(addr);
+			}
 		}
 
 		if addr < 0xC000 {
@@ -132,9 +136,11 @@ impl BUS {
 
 		if addr < 0xA000 {
 			// VRAM
-			debug!("Writing to VRAM at 0x{:04X}", addr);
-			self.memory[addr as usize] = data;
-			return;
+			if let Some(ppu) = &self.ppu {
+				let mut ppu = ppu.lock().unwrap();
+				ppu.write(addr, data);
+				return;
+			}
 		}
 
 		if addr < 0xC000 {
@@ -203,5 +209,9 @@ impl BUS {
 
 	pub fn cartridge_connect(&mut self, cart: Arc<Mutex<Cartridge>>) {
 		self.cartridge = Some(cart);
+	}
+
+	pub fn ppu_connect(&mut self, ppu: Arc<Mutex<PPU>>) {
+		self.ppu = Some(ppu);
 	}
 }

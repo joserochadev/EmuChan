@@ -3,6 +3,7 @@ mod cartridge;
 mod cpu;
 mod disassembler;
 mod emuchan;
+mod ppu;
 mod tests;
 mod ui;
 mod utils;

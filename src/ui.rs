@@ -1,6 +1,15 @@
 #![warn(dead_code)]
-use crate::utils::config::SCREEN_SIZE;
+use std::sync::{Arc, Mutex};
+
+use crate::{ppu::PPU, utils::config::SCREEN_SIZE};
 use sdl2::{event::Event, pixels::Color, rect::Rect};
+
+const COLOR_PALLET: [Color; 4] = [
+	Color::RGBA(223, 248, 208, 1), // light green
+	Color::RGBA(136, 192, 112, 1), // moderate green
+	Color::RGBA(54, 103, 82, 1),   // dark green
+	Color::RGBA(7, 24, 33, 1),     // very dark green
+];
 
 pub struct UI {
 	_context: sdl2::Sdl,
@@ -9,10 +18,12 @@ pub struct UI {
 	main_canvas: sdl2::render::Canvas<sdl2::video::Window>,
 	debug_canvas: sdl2::render::Canvas<sdl2::video::Window>,
 	event_pump: sdl2::EventPump,
+	ppu: Arc<Mutex<PPU>>,
+	scale: i32,
 }
 
 impl UI {
-	pub fn new() -> Self {
+	pub fn new(ppu: Arc<Mutex<PPU>>) -> Self {
 		let context = sdl2::init().expect("Failed to init SDL2 Context");
 		let video_subsystem = context
 			.video()
@@ -25,7 +36,7 @@ impl UI {
 
 		let main_width = SCREEN_SIZE.0 as u32;
 		let main_height = SCREEN_SIZE.1 as u32;
-		let debug_width = 256;
+		let debug_width = 16 * 8 * 3;
 		let debug_height = main_height;
 
 		let main_x = ((screen_width - main_width - debug_width) / 2) as u32;
@@ -67,11 +78,13 @@ impl UI {
 			main_canvas,
 			debug_canvas,
 			event_pump,
+			ppu,
+			scale: 3,
 		}
 	}
 
 	pub fn run(&mut self) {
-		'runnign: loop {
+		'running: loop {
 			for event in self.event_pump.poll_iter() {
 				match event {
 					Event::Quit { .. }
@@ -83,7 +96,7 @@ impl UI {
 						keycode: Some(sdl2::keyboard::Keycode::Escape),
 						..
 					} => {
-						break 'runnign;
+						break 'running;
 					}
 					_ => {}
 				}
@@ -96,12 +109,68 @@ impl UI {
 			self.debug_canvas.set_draw_color(Color::RGB(50, 50, 50));
 			self.debug_canvas.clear();
 
-			self.debug_canvas.set_draw_color(Color::RGB(200, 200, 200));
-			self
-				.debug_canvas
-				.fill_rect(Rect::new(10, 10, 32, 32))
-				.unwrap();
+			self.update_debug_window();
 			self.debug_canvas.present();
+		}
+	}
+
+	fn display_tile(&mut self, start_location: u16, tile_num: u16, x: i32, y: i32) {
+		let ppu = self.ppu.lock().unwrap();
+
+		let mut pixels = [[0; 8]; 8];
+
+		// read 1 tile of 16 bytes (2 bytes by row, 8 rows)
+		for tile in 0..8 {
+			let byte_1 = ppu.read(start_location + (tile_num * 16) + tile * 2);
+			let byte_2 = ppu.read(start_location + (tile_num * 16) + tile * 2 + 1);
+
+			// fill row of pixels, from left to right
+			for bit in 0..8 {
+				let lo = (byte_1 >> (7 - bit)) & 1;
+				let hi = (byte_2 >> (7 - bit)) & 1;
+
+				let color = (hi << 1) | lo;
+
+				pixels[tile as usize][bit] = color;
+			}
+		}
+
+		// draw tile on screen
+		for row in 0..8 {
+			for col in 0..8 {
+				let pixel = pixels[row][col];
+
+				let pixel_x = x + (col as i32 * self.scale);
+				let pixel_y = y + (row as i32 * self.scale);
+
+				let width = self.scale;
+				let height = self.scale;
+
+				self
+					.debug_canvas
+					.set_draw_color(COLOR_PALLET[pixel as usize]);
+				self
+					.debug_canvas
+					.fill_rect(Rect::new(pixel_x, pixel_y, width as u32, height as u32))
+					.unwrap();
+			}
+		}
+	}
+
+	fn update_debug_window(&mut self) {
+		let mut tile_num = 0;
+		let addr = 0x8000;
+		let spacing = 2;
+
+		// 384 tiles, 24 X 16
+
+		for row in 0..24 {
+			for col in 0..16 {
+				let x_draw = col * (8 * self.scale + spacing);
+				let y_draw = row * (8 * self.scale + spacing);
+				self.display_tile(addr, tile_num, x_draw, y_draw);
+				tile_num += 1;
+			}
 		}
 	}
 }

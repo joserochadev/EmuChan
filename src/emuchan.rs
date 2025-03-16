@@ -2,6 +2,7 @@
 use crate::bus::BUS;
 use crate::cartridge::Cartridge;
 use crate::cpu::{Register, CPU};
+use crate::ppu::PPU;
 use crate::ui::UI;
 use crate::utils::boot::BOOT_DMG;
 
@@ -33,6 +34,7 @@ pub struct EmuState {
 pub struct EmuChan {
 	pub bus: Arc<Mutex<BUS>>,
 	pub cpu: Arc<Mutex<CPU>>,
+	pub ppu: Arc<Mutex<PPU>>,
 	pub cartridge: Arc<Mutex<Cartridge>>,
 	pub ui: UI,
 	pub emulation_state: Arc<Mutex<EmulationState>>,
@@ -42,40 +44,43 @@ impl EmuChan {
 	pub fn new() -> Self {
 		let bus = Arc::new(Mutex::new(BUS::new()));
 		let cpu = Arc::new(Mutex::new(CPU::new(Arc::clone(&bus))));
+		let ppu = Arc::new(Mutex::new(PPU::new()));
 		let cartridge = Arc::new(Mutex::new(Cartridge::new()));
 		let emulation_state = Arc::new(Mutex::new(EmulationState::RUNNING));
 
-		let mut ui = UI::new();
+		let mut ui = UI::new(Arc::clone(&ppu));
 
-		bus
-			.lock()
-			.unwrap()
-			.cartridge_connect(Arc::clone(&cartridge));
+		{
+			let mut bus = bus.lock().unwrap();
+
+			// Conecting cartridge to bus
+			bus.cartridge_connect(Arc::clone(&cartridge));
+			// Conecting ppu to bus
+			bus.ppu_connect(Arc::clone(&ppu));
+			// Load boot in memory
+			bus.memory[0..=255].copy_from_slice(&BOOT_DMG);
+			// Simulating v-blank period
+			bus.write(0xFF44, 0x90);
+		}
 
 		{
 			let mut cart = cartridge.lock().unwrap();
 
 			// Load ROM
-			cart.load_rom("./roms/games/pokemon.gb".to_string());
+			cart.load_rom("./roms/games/tetris.gb".to_string());
 
 			// Remove null bytes
 			let game_title = cart.game_title.trim_end_matches('\0');
-
 			let new_window_title = format!("EmuChan - {}", game_title);
-			println!("{}", new_window_title);
 
 			// Set window title with game name
 			ui.main_window.set_title(&new_window_title).unwrap();
 		}
 
-		bus.lock().unwrap().memory[0..=255].copy_from_slice(&BOOT_DMG);
-
-		// Simulating v-blank period
-		bus.lock().unwrap().write(0xff44, 0x90);
-
 		Self {
 			bus,
 			cpu,
+			ppu,
 			cartridge,
 			ui,
 			emulation_state,
@@ -88,10 +93,13 @@ impl EmuChan {
 
 		thread::spawn(move || {
 			let mut cpu = cpu_clone.lock().unwrap();
+			let mut emulation_state = emulation_state_clone.lock().unwrap();
 
-			while *emulation_state_clone.lock().unwrap() == EmulationState::RUNNING {
+			while *emulation_state == EmulationState::RUNNING {
 				if let Err(e) = cpu.step() {
-					panic!("{}\n{}", e, cpu);
+					*emulation_state = EmulationState::PAUSED;
+					println!("EmuChan is PAUSED.");
+					println!("{}\n{}", e, cpu);
 				}
 			}
 		});
