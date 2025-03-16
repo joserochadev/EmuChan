@@ -20,7 +20,7 @@ use emuchan::EmuChan;
 
 #[derive(Parser)]
 #[command(
-	bin_name = "cargo run",
+	bin_name = "cargo run --",
 	author = "joserochadev",
 	version = "0.1.0",
 	about = "EmuChan Emulator CLI",
@@ -34,7 +34,12 @@ struct CLI {
 #[derive(Subcommand)]
 enum Commands {
 	/// Starts the emulator and runs the loaded ROM.
-	RUN,
+	/// 
+	/// Example:
+	/// ```
+	/// cargo run -- run path/to/rom.gb
+	/// ```
+	RUN { path: String},
 
 	/// Runs a specific test from a JSON file.
 	///
@@ -67,9 +72,9 @@ fn main() {
 	let cli = CLI::parse();
 
 	match cli.command {
-		Commands::RUN => {
+		Commands::RUN {path} => {
 			println!("🔄 Starting the emulator...");
-			let mut emuchan = EmuChan::new();
+			let mut emuchan = EmuChan::new(Some(path));
 			emuchan.run();
 		}
 
@@ -90,7 +95,7 @@ fn main() {
 
 			let instructions = parse_from_file("./src/disassembler/instructions.json");
 
-			let emuchan = EmuChan::new();
+			let emuchan = EmuChan::new(None);
 			disassemble(start_addr as usize, &emuchan.bus.lock().unwrap().memory, &instructions, length);
 		}
 	}

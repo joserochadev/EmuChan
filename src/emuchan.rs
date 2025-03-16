@@ -38,10 +38,11 @@ pub struct EmuChan {
 	pub cartridge: Arc<Mutex<Cartridge>>,
 	pub ui: UI,
 	pub emulation_state: Arc<Mutex<EmulationState>>,
+
 }
 
 impl EmuChan {
-	pub fn new() -> Self {
+	pub fn new(rom_path: Option<String> ) -> Self {
 		let bus = Arc::new(Mutex::new(BUS::new()));
 		let cpu = Arc::new(Mutex::new(CPU::new(Arc::clone(&bus))));
 		let ppu = Arc::new(Mutex::new(PPU::new()));
@@ -67,7 +68,9 @@ impl EmuChan {
 			let mut cart = cartridge.lock().unwrap();
 
 			// Load ROM
-			cart.load_rom("./roms/games/tetris.gb".to_string());
+			if let Some(rom) = rom_path {
+				cart.load_rom(rom);
+			}
 
 			// Remove null bytes
 			let game_title = cart.game_title.trim_end_matches('\0');
