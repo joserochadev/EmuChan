@@ -1,14 +1,14 @@
 mod bus;
 mod cartridge;
+mod config;
 mod cpu;
-mod disassembler;
 mod emuchan;
 mod ppu;
 mod tests;
 mod ui;
 mod utils;
 
-use disassembler::{disassemble, parse_from_file};
+use utils::disassembler::{disassemble, parse_from_file};
 
 use tests::sm83::SM83;
 

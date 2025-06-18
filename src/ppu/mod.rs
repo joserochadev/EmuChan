@@ -4,9 +4,9 @@ use std::fmt;
 mod register;
 mod utils;
 
+use crate::config::GAMEBOY_RESOLUTION;
 use crate::ppu::register::{lcdc::LCDC, stat::STAT};
 use crate::ppu::utils::pallete::Pallete;
-use crate::utils::config::GAMEBOY_RESOLUTION;
 
 const ACESSES_OAM_CYCLES: u32 = 20; // Mode 2 = 80 dots; 80 / 4 M-Cycle = 20
 const ACESSES_VRAM_CYCLES: u32 = 43; // Mode 3 = 172 dots; 172 / 4 M-Cycle = 43
@@ -135,7 +135,7 @@ impl PPU {
 		if self.lcdc.is_set(LCDC::BG_ON) {
 			let bg_map = if self.lcdc.is_set(LCDC::BG_MAP) { 0x1C00 } else { 0x1800 };
 
-			for i in 0..GAMEBOY_RESOLUTION.0 {
+			for i in 0..GAMEBOY_RESOLUTION.width {
 				let background_x = (i as u8).wrapping_add(self.scx);
 				let background_y = self.ly.wrapping_add(self.scy);
 
@@ -163,7 +163,7 @@ impl PPU {
 
 				let color = bg_pallete[color_index as usize];
 
-				let pixel_index = (self.ly as usize * GAMEBOY_RESOLUTION.0 as usize) + i as usize;
+				let pixel_index = (self.ly as usize * GAMEBOY_RESOLUTION.width as usize) + i as usize;
 
 				self.video_buffer[pixel_index] = color
 			}
@@ -220,9 +220,9 @@ impl PPU {
 	}
 
 	pub fn show_video_buffer(&self) {
-		for y in 0..GAMEBOY_RESOLUTION.1 {
-			for x in 0..GAMEBOY_RESOLUTION.0 {
-				let pixel_index = (y as usize * GAMEBOY_RESOLUTION.0 as usize) + x as usize;
+		for y in 0..GAMEBOY_RESOLUTION.height {
+			for x in 0..GAMEBOY_RESOLUTION.width {
+				let pixel_index = (y as usize * GAMEBOY_RESOLUTION.width as usize) + x as usize;
 				print!("{}", self.video_buffer[pixel_index]);
 			}
 			println!();
