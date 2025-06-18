@@ -1,111 +1,17 @@
 #![allow(dead_code)]
-use crate::utils::config::GAMEBOY_RESOLUTION;
 use std::fmt;
+
+mod register;
+mod utils;
+
+use crate::ppu::register::{lcdc::LCDC, stat::STAT};
+use crate::ppu::utils::pallete::Pallete;
+use crate::utils::config::GAMEBOY_RESOLUTION;
 
 const ACESSES_OAM_CYCLES: u32 = 20; // Mode 2 = 80 dots; 80 / 4 M-Cycle = 20
 const ACESSES_VRAM_CYCLES: u32 = 43; // Mode 3 = 172 dots; 172 / 4 M-Cycle = 43
 const HBLANK_CYCLES: u32 = 51; // Mode 0 = 204 dots; 204 / 4 M-Cycle = 51
 const VBLANK_CYCLES: u32 = 114; // Mode 1 = 4560 dots (10 scanlines) ; 4560 / 4 M-Cycle = 1140 = 114 cycles per scanline
-
-#[derive(Debug)]
-pub struct LCDC(u8);
-
-impl LCDC {
-	pub const BG_ON: u8 = 0b0000_0001;
-	pub const OBJ_ON: u8 = 0b0000_0010;
-	pub const OBJ_SIZE: u8 = 0b0000_0100;
-	pub const BG_MAP: u8 = 0b0000_1000;
-	pub const BG_ADDR: u8 = 0b0001_0000;
-	pub const WINDOW_ON: u8 = 0b0010_0000;
-	pub const WINDOW_MAP: u8 = 0b0100_0000;
-	pub const LCD_ON: u8 = 0b1000_0000;
-
-	pub fn new(value: u8) -> Self {
-		Self(value)
-	}
-
-	pub fn set_lcdc(&mut self, value: u8) {
-		self.0 = value;
-	}
-
-	pub fn get_lcdc(&self) -> u8 {
-		self.0
-	}
-
-	pub fn clear(&mut self, flag: u8) {
-		self.0 &= !flag;
-	}
-
-	pub fn set(&mut self, flag: u8) {
-		self.0 |= flag;
-	}
-
-	pub fn is_set(&self, flag: u8) -> bool {
-		self.0 & flag != 0
-	}
-}
-
-#[derive(Debug)]
-pub struct STAT(u8);
-
-impl STAT {
-	pub const PPU_MODE: u8 = 0b0000_0011;
-	pub const LYC_EQ_LY: u8 = 0b0000_0100;
-	pub const HBLANK_INT: u8 = 0b0000_1000; // Mode 0 interupt
-	pub const VBLANK_INT: u8 = 0b0001_0000; // Mode 1 interupt
-	pub const OAM_INT: u8 = 0b0010_0000; // Mode 2 interupt
-	pub const LYC_INT: u8 = 0b0100_0000;
-
-	pub fn new(value: u8) -> Self {
-		Self(value)
-	}
-
-	pub fn set_stat(&mut self, value: u8) {
-		self.0 = value;
-	}
-
-	pub fn get_stat(&self) -> u8 {
-		self.0
-	}
-
-	pub fn clear(&mut self, flag: u8) {
-		self.0 &= !flag;
-	}
-
-	pub fn set(&mut self, flag: u8) {
-		self.0 |= flag;
-	}
-
-	pub fn is_set(&self, flag: u8) -> bool {
-		self.0 & flag != 0
-	}
-}
-
-#[derive(Debug)]
-pub struct Pallete(u8);
-
-impl Pallete {
-	pub fn new(value: u8) -> Self {
-		Self(value)
-	}
-
-	pub fn get_pallete(&self) -> u8 {
-		self.0
-	}
-
-	pub fn set_pallete(&mut self, value: u8) {
-		self.0 = value;
-	}
-
-	pub fn extract_pallete(&self) -> [u8; 4] {
-		let mut colors = [0; 4];
-		for i in 0..4 {
-			colors[i] = (self.0 >> (i * 2)) & 0b11;
-		}
-
-		return colors;
-	}
-}
 
 #[derive(Debug)]
 pub enum Mode {
@@ -132,7 +38,7 @@ pub struct PPU {
 	pub wx: u8,                // FF4B
 	pub mode: Mode,
 	pub cycles: u32,
-	pub video_buffer: [u8; (160*144) as usize],
+	pub video_buffer: [u8; (160 * 144) as usize],
 	pub current_line: u8,
 }
 
@@ -154,7 +60,7 @@ impl PPU {
 			wy: 0x00,
 			mode: Mode::AccessOAM,
 			cycles: ACESSES_OAM_CYCLES,
-			video_buffer: [0; (160*144)as usize],
+			video_buffer: [0; (160 * 144) as usize],
 			current_line: 0,
 		}
 	}
@@ -241,7 +147,7 @@ impl PPU {
 
 				let tile_data = if self.lcdc.is_set(LCDC::BG_ADDR) {
 					0x0000 + (tile_id * 16)
-				}else{
+				} else {
 					0x1000 + (((tile_id as i8) * 16) as u16)
 				};
 
@@ -260,7 +166,6 @@ impl PPU {
 				let pixel_index = (self.ly as usize * GAMEBOY_RESOLUTION.0 as usize) + i as usize;
 
 				self.video_buffer[pixel_index] = color
-
 			}
 		}
 	}
@@ -294,7 +199,7 @@ impl PPU {
 				if self.ly == 144 {
 					self.mode = Mode::VBlank;
 					self.cycles = VBLANK_CYCLES;
-				}else{
+				} else {
 					self.mode = Mode::AccessOAM;
 					self.cycles = ACESSES_OAM_CYCLES;
 				}
@@ -308,13 +213,12 @@ impl PPU {
 					self.mode = Mode::AccessOAM;
 					self.cycles = ACESSES_OAM_CYCLES;
 				} else {
-
 					self.cycles = VBLANK_CYCLES;
 				}
 			}
 		}
 	}
-	
+
 	pub fn show_video_buffer(&self) {
 		for y in 0..GAMEBOY_RESOLUTION.1 {
 			for x in 0..GAMEBOY_RESOLUTION.0 {
