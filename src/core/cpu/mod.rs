@@ -4,71 +4,12 @@ use std::{
 	sync::{Arc, Mutex},
 };
 
+mod register;
+
+use register::{Flags, Register, Register16};
+
 // use crate::bus::BUS;
 use crate::core::bus::BUS;
-
-pub enum Flags {
-	Z, // Zero flag
-	N, // Subtraction flag (BCD)
-	H, // Half Carry flag (BCD) HC = (((a & 0xF) + (b & 0xF)) & 0x10) == 0x10
-	C, // Carry flag
-}
-
-#[derive(Default, Debug, Clone)]
-pub struct Register {
-	pub a: u8,
-	pub b: u8,
-	pub c: u8,
-	pub d: u8,
-	pub e: u8,
-	pub f: u8,
-	pub h: u8,
-	pub l: u8,
-	pub pc: u16,
-	pub sp: u16,
-	pub ime: u8,
-	pub ie: u8,
-}
-
-impl Register {
-	pub fn new() -> Register {
-		Register::default()
-	}
-
-	pub fn get_bc(&self) -> u16 {
-		let register = ((self.b as u16) << 8) | self.c as u16;
-		register
-	}
-
-	pub fn set_bc(&mut self, data: u16) {
-		let hi = (data >> 8) & 0xFF;
-		let lo = data & 0xFF;
-		self.b = hi as u8;
-		self.c = lo as u8;
-	}
-	pub fn get_de(&self) -> u16 {
-		let register = ((self.d as u16) << 8) | self.e as u16;
-		register
-	}
-
-	pub fn set_de(&mut self, data: u16) {
-		let hi = (data >> 8) & 0xFF;
-		let lo = data & 0xFF;
-		self.d = hi as u8;
-		self.e = lo as u8;
-	}
-	pub fn get_hl(&self) -> u16 {
-		let register = ((self.h as u16) << 8) | self.l as u16;
-		register
-	}
-
-	pub fn set_hl(&mut self, data: u16) {
-		let hi = (data >> 8) & 0xFF;
-		let lo = data & 0xFF;
-		self.h = hi as u8;
-		self.l = lo as u8;
-	}
-}
 
 #[derive(Debug)]
 pub struct CPU {
@@ -93,15 +34,11 @@ impl CPU {
 	pub fn read(&mut self, addr: u16) -> u8 {
 		let bus = self.bus.lock().unwrap();
 		bus.read(addr)
-		// unsafe { (*self.bus).read(addr) }
 	}
 
 	pub fn write(&mut self, addr: u16, data: u8) {
 		let mut bus = self.bus.lock().unwrap();
 		bus.write(addr, data);
-		// unsafe {
-		// 	(*self.bus).write(addr, data);
-		// }
 	}
 
 	pub fn view_memory_at(&self, memory: &[u8], address: usize, n: usize) {
@@ -120,30 +57,6 @@ impl CPU {
 		);
 	}
 
-	pub fn get_flag(&self, flag: Flags) -> u8 {
-		match flag {
-			Flags::Z => (self.reg.f >> 7) & 0b1,
-			Flags::N => (self.reg.f >> 6) & 0b1,
-			Flags::H => (self.reg.f >> 5) & 0b1,
-			Flags::C => (self.reg.f >> 4) & 0b1,
-		}
-	}
-
-	pub fn set_flag(&mut self, flag: Flags, conditional: bool) {
-		let bit = match flag {
-			Flags::Z => 7,
-			Flags::N => 6,
-			Flags::H => 5,
-			Flags::C => 4,
-		};
-
-		self.reg.f = if conditional {
-			self.reg.f | (1 << bit) // Seta o bit
-		} else {
-			self.reg.f & !(1 << bit) // Limpa o bit
-		};
-	}
-
 	pub fn set_cycles(&mut self, t_cycles: usize) {
 		self.cycles = t_cycles / 4; // convert to M-Cycles
 	}
@@ -154,7 +67,6 @@ impl CPU {
 
 		data
 	}
-
 	pub fn fetch16(&mut self) -> u16 {
 		let lo = self.read(self.reg.pc);
 		let hi = self.read(self.reg.pc + 1);
@@ -198,9 +110,9 @@ impl CPU {
 				self.reg.b = result;
 				let hc = (before & 0xF) + (1 & 0xF);
 
-				self.set_flag(Flags::Z, result == 0);
-				self.set_flag(Flags::N, false);
-				self.set_flag(Flags::H, hc > 0xF);
+				self.reg.set_flag(Flags::Z, result == 0);
+				self.reg.set_flag(Flags::N, false);
+				self.reg.set_flag(Flags::H, hc > 0xF);
 				self.set_cycles(4);
 			}
 			// DEC B
@@ -211,9 +123,9 @@ impl CPU {
 
 				let hc = (before & 0xF) < 1;
 
-				self.set_flag(Flags::Z, result == 0);
-				self.set_flag(Flags::N, true);
-				self.set_flag(Flags::H, hc);
+				self.reg.set_flag(Flags::Z, result == 0);
+				self.reg.set_flag(Flags::N, true);
+				self.reg.set_flag(Flags::H, hc);
 				self.set_cycles(4);
 			}
 			// LD B, u8
@@ -229,9 +141,9 @@ impl CPU {
 				self.reg.c = result;
 				let hc = (before & 0xF) + (1 & 0xF);
 
-				self.set_flag(Flags::Z, result == 0);
-				self.set_flag(Flags::N, false);
-				self.set_flag(Flags::H, hc > 0xF);
+				self.reg.set_flag(Flags::Z, result == 0);
+				self.reg.set_flag(Flags::N, false);
+				self.reg.set_flag(Flags::H, hc > 0xF);
 				self.set_cycles(4);
 			}
 			// DEC C
@@ -242,9 +154,9 @@ impl CPU {
 
 				let hc = (before & 0xF) < 1;
 
-				self.set_flag(Flags::Z, result == 0);
-				self.set_flag(Flags::N, true);
-				self.set_flag(Flags::H, hc);
+				self.reg.set_flag(Flags::Z, result == 0);
+				self.reg.set_flag(Flags::N, true);
+				self.reg.set_flag(Flags::H, hc);
 				self.set_cycles(4);
 			}
 			// LD C, u8
@@ -256,13 +168,13 @@ impl CPU {
 			// LD (DE), A
 			0x11 => {
 				let data = self.fetch16();
-				self.reg.set_de(data);
+				self.reg.set_r16(Register16::DE, data);
 				self.set_cycles(12);
 			}
 			// INC DE
 			0x13 => {
-				let de = self.reg.get_de();
-				self.reg.set_de(de + 1);
+				let de = self.reg.get_r16(Register16::DE);
+				self.reg.set_r16(Register16::DE, de + 1);
 				self.set_cycles(8);
 			}
 			// DEC D
@@ -273,9 +185,9 @@ impl CPU {
 
 				let hc = (before & 0xF) < 1;
 
-				self.set_flag(Flags::Z, result == 0);
-				self.set_flag(Flags::N, true);
-				self.set_flag(Flags::H, hc);
+				self.reg.set_flag(Flags::Z, result == 0);
+				self.reg.set_flag(Flags::N, true);
+				self.reg.set_flag(Flags::H, hc);
 				self.set_cycles(4);
 			}
 			// LD D, u8
@@ -286,15 +198,15 @@ impl CPU {
 			}
 			// RLA
 			0x17 => {
-				let carry = self.get_flag(Flags::C);
+				let carry = self.reg.get_flag(Flags::C);
 				let bit_7 = (self.reg.a >> 7) & 0b1;
 
 				self.reg.a = (self.reg.a << 1) | carry;
 
-				self.set_flag(Flags::Z, false);
-				self.set_flag(Flags::N, false);
-				self.set_flag(Flags::H, false);
-				self.set_flag(Flags::C, bit_7 == 1);
+				self.reg.set_flag(Flags::Z, false);
+				self.reg.set_flag(Flags::N, false);
+				self.reg.set_flag(Flags::H, false);
+				self.reg.set_flag(Flags::C, bit_7 == 1);
 
 				self.set_cycles(4);
 			}
@@ -306,7 +218,7 @@ impl CPU {
 			}
 			// LD A, (DE)
 			0x1A => {
-				let addr = self.reg.get_de();
+				let addr = self.reg.get_r16(Register16::DE);
 				let data = self.read(addr);
 				self.reg.a = data;
 				self.set_cycles(8);
@@ -319,9 +231,9 @@ impl CPU {
 
 				let hc = (before & 0xF) < 1;
 
-				self.set_flag(Flags::Z, result == 0);
-				self.set_flag(Flags::N, true);
-				self.set_flag(Flags::H, hc);
+				self.reg.set_flag(Flags::Z, result == 0);
+				self.reg.set_flag(Flags::N, true);
+				self.reg.set_flag(Flags::H, hc);
 				self.set_cycles(4);
 			}
 			// LD E, u8
@@ -333,7 +245,7 @@ impl CPU {
 			// JR NZ, i8
 			0x20 => {
 				let data = self.fetch() as i8;
-				if self.get_flag(Flags::Z) == 0 {
+				if self.reg.get_flag(Flags::Z) == 0 {
 					self.reg.pc = self.reg.pc.wrapping_add(data as u16);
 					self.set_cycles(12);
 				} else {
@@ -343,21 +255,21 @@ impl CPU {
 			// LD HL, u16
 			0x21 => {
 				let data = self.fetch16();
-				self.reg.set_hl(data);
+				self.reg.set_r16(Register16::HL, data);
 				self.set_cycles(12);
 			}
 			// LD (HL+), A
 			0x22 => {
 				let data = self.reg.a;
-				let addr = self.reg.get_hl();
+				let addr = self.reg.get_r16(Register16::HL);
 				self.write(addr, data);
-				self.reg.set_hl(addr + 1);
+				self.reg.set_r16(Register16::HL, addr + 1);
 				self.set_cycles(8);
 			}
 			// INC HL
 			0x23 => {
-				let hl = self.reg.get_hl();
-				self.reg.set_hl(hl + 1);
+				let hl = self.reg.get_r16(Register16::HL);
+				self.reg.set_r16(Register16::HL, hl + 1);
 				self.set_cycles(8);
 			}
 			// INC H
@@ -367,15 +279,15 @@ impl CPU {
 				self.reg.h = result;
 				let hc = (before & 0xF) + (1 & 0xF);
 
-				self.set_flag(Flags::Z, result == 0);
-				self.set_flag(Flags::N, false);
-				self.set_flag(Flags::H, hc > 0xF);
+				self.reg.set_flag(Flags::Z, result == 0);
+				self.reg.set_flag(Flags::N, false);
+				self.reg.set_flag(Flags::H, hc > 0xF);
 				self.set_cycles(4);
 			}
 			// JR Z, i8
 			0x28 => {
 				let data = self.fetch() as i8;
-				if self.get_flag(Flags::Z) == 1 {
+				if self.reg.get_flag(Flags::Z) == 1 {
 					self.reg.pc = self.reg.pc.wrapping_add(data as u16);
 					self.set_cycles(12);
 				} else {
@@ -396,11 +308,11 @@ impl CPU {
 			}
 			// LD (HL-), A
 			0x32 => {
-				let addr = self.reg.get_hl();
+				let addr = self.reg.get_r16(Register16::HL);
 				let data = self.reg.a;
 				self.write(addr, data);
 
-				self.reg.set_hl(addr - 1);
+				self.reg.set_r16(Register16::HL, addr - 1);
 				self.set_cycles(8);
 			}
 			// DEC A
@@ -411,9 +323,9 @@ impl CPU {
 
 				let hc = (before & 0xF) < 1;
 
-				self.set_flag(Flags::Z, result == 0);
-				self.set_flag(Flags::N, true);
-				self.set_flag(Flags::H, hc);
+				self.reg.set_flag(Flags::Z, result == 0);
+				self.reg.set_flag(Flags::N, true);
+				self.reg.set_flag(Flags::H, hc);
 				self.set_cycles(4);
 			}
 			// LD A, u8
@@ -443,7 +355,7 @@ impl CPU {
 			// LD (HL), A
 			0x77 => {
 				let data = self.reg.a;
-				let addr = self.reg.get_hl();
+				let addr = self.reg.get_r16(Register16::HL);
 				self.write(addr, data);
 				self.set_cycles(8);
 			}
@@ -473,7 +385,7 @@ impl CPU {
 			}
 			// ADD A, (HL)
 			0x86 => {
-				let addr = self.reg.get_hl();
+				let addr = self.reg.get_r16(Register16::HL);
 				let data = self.read(addr);
 				let a = self.reg.a;
 				let result = a.wrapping_add(data);
@@ -482,10 +394,10 @@ impl CPU {
 				let hc = ((a & 0xF) + (data & 0xF)) > 0xF;
 				let c = (a as u16 + data as u16) > 0xFF;
 
-				self.set_flag(Flags::Z, result == 0);
-				self.set_flag(Flags::N, false);
-				self.set_flag(Flags::H, hc);
-				self.set_flag(Flags::C, c);
+				self.reg.set_flag(Flags::Z, result == 0);
+				self.reg.set_flag(Flags::N, false);
+				self.reg.set_flag(Flags::H, hc);
+				self.reg.set_flag(Flags::C, c);
 
 				self.set_cycles(8);
 			}
@@ -498,10 +410,10 @@ impl CPU {
 
 				let hc = (a & 0xF) < (b & 0xF);
 
-				self.set_flag(Flags::Z, result == 0);
-				self.set_flag(Flags::N, true);
-				self.set_flag(Flags::H, hc);
-				self.set_flag(Flags::C, a < b);
+				self.reg.set_flag(Flags::Z, result == 0);
+				self.reg.set_flag(Flags::N, true);
+				self.reg.set_flag(Flags::H, hc);
+				self.reg.set_flag(Flags::C, a < b);
 
 				self.set_cycles(4);
 			}
@@ -510,15 +422,15 @@ impl CPU {
 				let result = self.reg.a ^ self.reg.a;
 				self.reg.a = result;
 
-				self.set_flag(Flags::Z, result == 0);
-				self.set_flag(Flags::N, false);
-				self.set_flag(Flags::H, false);
-				self.set_flag(Flags::C, false);
+				self.reg.set_flag(Flags::Z, result == 0);
+				self.reg.set_flag(Flags::N, false);
+				self.reg.set_flag(Flags::H, false);
+				self.reg.set_flag(Flags::C, false);
 				self.set_cycles(4);
 			}
 			// CP A, (HL)
 			0xBE => {
-				let addr = self.reg.get_hl();
+				let addr = self.reg.get_r16(Register16::HL);
 				let data = self.read(addr);
 				let a = self.reg.a;
 				let result = a.wrapping_sub(data);
@@ -526,22 +438,22 @@ impl CPU {
 				let hc = (a & 0xF) < (data & 0xF);
 				let c = a < data;
 
-				self.set_flag(Flags::Z, result == 0);
-				self.set_flag(Flags::N, true);
-				self.set_flag(Flags::H, hc);
-				self.set_flag(Flags::C, c);
+				self.reg.set_flag(Flags::Z, result == 0);
+				self.reg.set_flag(Flags::N, true);
+				self.reg.set_flag(Flags::H, hc);
+				self.reg.set_flag(Flags::C, c);
 
 				self.set_cycles(8);
 			}
 			// POP BC
 			0xC1 => {
 				let data = self.pop();
-				self.reg.set_bc(data);
+				self.reg.set_r16(Register16::BC, data);
 				self.set_cycles(12);
 			}
 			// PUSH BC
 			0xC5 => {
-				let data = self.reg.get_bc();
+				let data = self.reg.get_r16(Register16::BC);
 				self.push(data);
 				self.set_cycles(16);
 			}
@@ -558,15 +470,15 @@ impl CPU {
 				match cb_intruction {
 					// RL C
 					0x11 => {
-						let carry = self.get_flag(Flags::C);
+						let carry = self.reg.get_flag(Flags::C);
 						let bit_7 = (self.reg.c >> 7) & 0b1;
 
 						self.reg.c = (self.reg.c << 1) | carry;
 
-						self.set_flag(Flags::Z, self.reg.c == 0);
-						self.set_flag(Flags::N, false);
-						self.set_flag(Flags::H, false);
-						self.set_flag(Flags::C, bit_7 == 1);
+						self.reg.set_flag(Flags::Z, self.reg.c == 0);
+						self.reg.set_flag(Flags::N, false);
+						self.reg.set_flag(Flags::H, false);
+						self.reg.set_flag(Flags::C, bit_7 == 1);
 
 						self.set_cycles(8);
 					}
@@ -574,9 +486,9 @@ impl CPU {
 					0x7C => {
 						let bit_7_h = (self.reg.h >> 7) & 0b1;
 
-						self.set_flag(Flags::Z, bit_7_h == 0);
-						self.set_flag(Flags::N, false);
-						self.set_flag(Flags::H, true);
+						self.reg.set_flag(Flags::Z, bit_7_h == 0);
+						self.reg.set_flag(Flags::N, false);
+						self.reg.set_flag(Flags::H, true);
 						self.set_cycles(8);
 					}
 					_ => return Err(format!("Unknow CB instruction. OPCODE: {:02X}", cb_intruction)),
@@ -628,10 +540,10 @@ impl CPU {
 				let hc = (before & 0xF) < (n & 0xF);
 				let c = before < n;
 
-				self.set_flag(Flags::Z, result == 0);
-				self.set_flag(Flags::N, true);
-				self.set_flag(Flags::H, hc);
-				self.set_flag(Flags::C, c);
+				self.reg.set_flag(Flags::Z, result == 0);
+				self.reg.set_flag(Flags::N, true);
+				self.reg.set_flag(Flags::H, hc);
+				self.reg.set_flag(Flags::C, c);
 
 				self.set_cycles(8);
 			}
@@ -663,10 +575,10 @@ impl fmt::Display for CPU {
 			f,
 			"H: 0x{:02X}    Z:{} N:{} H:{} C:{}",
 			self.reg.h,
-			self.get_flag(Flags::Z),
-			self.get_flag(Flags::N),
-			self.get_flag(Flags::H),
-			self.get_flag(Flags::C)
+			self.reg.get_flag(Flags::Z),
+			self.reg.get_flag(Flags::N),
+			self.reg.get_flag(Flags::H),
+			self.reg.get_flag(Flags::C)
 		)?;
 		writeln!(f, "L: 0x{:02X}", self.reg.l)?;
 		writeln!(f, "PC: 0x{:04X}", self.reg.pc)?;

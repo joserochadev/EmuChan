@@ -2,9 +2,10 @@
 use crate::common::boot::BOOT_DMG;
 use crate::core::bus::BUS;
 use crate::core::cartridge::Cartridge;
-use crate::core::cpu::{Register, CPU};
+use crate::core::cpu::CPU;
 use crate::core::ppu::PPU;
 use crate::ui::UI;
+
 
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -26,7 +27,7 @@ pub struct EmuStateFlags {
 }
 
 pub struct EmuState {
-	pub registers: Register,
+	// pub registers: Register,
 	pub flags: EmuStateFlags,
 	pub emulation_state: EmulationState,
 }
