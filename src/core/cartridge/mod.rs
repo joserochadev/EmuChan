@@ -2,13 +2,13 @@ use log::{debug, info};
 use std::fs::File;
 use std::io::{BufReader, Read};
 
-mod utils;
+mod common;
 
-use crate::cartridge::utils::cartridge_destination::get_destination;
-use crate::cartridge::utils::cartridge_type::get_cartridge_type;
-use crate::cartridge::utils::licensee_codes::{get_old_publisher, get_publisher};
-use crate::cartridge::utils::ram_size::get_ram_size;
-use crate::cartridge::utils::rom_size::get_rom_size;
+use common::cartridge_destination::get_destination;
+use common::cartridge_type::get_cartridge_type;
+use common::licensee_codes::{get_old_publisher, get_publisher};
+use common::ram_size::get_ram_size;
+use common::rom_size::get_rom_size;
 
 #[derive(Debug)]
 pub struct Cartridge {

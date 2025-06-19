@@ -5,8 +5,8 @@ use std::fs::File;
 use std::io::BufReader;
 use std::sync::{Arc, Mutex};
 
-use crate::bus::BUS;
-use crate::cpu::CPU;
+use crate::core::bus::BUS;
+use crate::core::cpu::CPU;
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 struct RegisteState {

@@ -1,12 +1,12 @@
 #![allow(dead_code)]
 use std::fmt;
 
+mod common;
 mod register;
-mod utils;
 
 use crate::config::GAMEBOY_RESOLUTION;
-use crate::ppu::register::{lcdc::LCDC, stat::STAT};
-use crate::ppu::utils::pallete::Pallete;
+use common::pallete::Pallete;
+use register::{lcdc::LCDC, stat::STAT};
 
 const ACESSES_OAM_CYCLES: u32 = 20; // Mode 2 = 80 dots; 80 / 4 M-Cycle = 20
 const ACESSES_VRAM_CYCLES: u32 = 43; // Mode 3 = 172 dots; 172 / 4 M-Cycle = 43

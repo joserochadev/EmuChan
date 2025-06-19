@@ -1,10 +1,10 @@
 #![allow(dead_code)]
-use crate::bus::BUS;
-use crate::cartridge::Cartridge;
-use crate::cpu::{Register, CPU};
-use crate::ppu::PPU;
+use crate::common::boot::BOOT_DMG;
+use crate::core::bus::BUS;
+use crate::core::cartridge::Cartridge;
+use crate::core::cpu::{Register, CPU};
+use crate::core::ppu::PPU;
 use crate::ui::UI;
-use crate::utils::boot::BOOT_DMG;
 
 use std::sync::{Arc, Mutex};
 use std::thread;

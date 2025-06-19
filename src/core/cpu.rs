@@ -4,7 +4,8 @@ use std::{
 	sync::{Arc, Mutex},
 };
 
-use crate::bus::BUS;
+// use crate::bus::BUS;
+use crate::core::bus::BUS;
 
 pub enum Flags {
 	Z, // Zero flag

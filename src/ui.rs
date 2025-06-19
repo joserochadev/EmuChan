@@ -2,7 +2,7 @@
 use std::sync::{Arc, Mutex};
 
 use crate::config::SCREEN_SIZE;
-use crate::ppu::PPU;
+use crate::core::ppu::PPU;
 use sdl2::{event::Event, pixels::Color, rect::Rect};
 
 const COLOR_PALLET: [Color; 4] = [

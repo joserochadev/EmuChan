@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 clap = {version = "4", features = ["derive"]}
 colored = "3.0.0"
+eframe = "0.31.1"
 env_logger = "0.10.2"
 log = "0.4.22"
 sdl2 = "0.37.0"
