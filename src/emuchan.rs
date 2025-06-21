@@ -6,7 +6,6 @@ use crate::core::cpu::CPU;
 use crate::core::ppu::PPU;
 use crate::ui::UI;
 
-
 use std::sync::{Arc, Mutex};
 use std::thread;
 

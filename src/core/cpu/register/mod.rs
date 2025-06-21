@@ -1,9 +1,21 @@
+#[derive(Debug, Clone, Copy)]
+pub enum Register8 {
+	A,
+	B,
+	C,
+	D,
+	E,
+	H,
+	L,
+}
+
 #[derive(Clone, Copy)]
 pub enum Register16 {
 	AF,
 	BC,
 	DE,
 	HL,
+	SP,
 }
 
 pub enum Flags {
@@ -34,12 +46,37 @@ impl Register {
 		Register::default()
 	}
 
+	pub fn get_r8(&self, reg: Register8) -> u8 {
+		match reg {
+			Register8::A => self.a,
+			Register8::B => self.b,
+			Register8::C => self.c,
+			Register8::D => self.d,
+			Register8::E => self.e,
+			Register8::H => self.h,
+			Register8::L => self.l,
+		}
+	}
+
+	pub fn set_r8(&mut self, reg: Register8, value: u8) {
+		match reg {
+			Register8::A => self.a = value,
+			Register8::B => self.b = value,
+			Register8::C => self.c = value,
+			Register8::D => self.d = value,
+			Register8::E => self.e = value,
+			Register8::H => self.h = value,
+			Register8::L => self.l = value,
+		}
+	}
+
 	pub fn get_r16(&self, reg: Register16) -> u16 {
 		match reg {
 			Register16::AF => ((self.a as u16) << 8) | (self.f as u16),
 			Register16::BC => ((self.b as u16) << 8) | (self.c as u16),
 			Register16::DE => ((self.d as u16) << 8) | (self.e as u16),
 			Register16::HL => ((self.h as u16) << 8) | (self.l as u16),
+			Register16::SP => self.sp,
 		}
 	}
 
@@ -63,6 +100,9 @@ impl Register {
 			Register16::HL => {
 				self.h = hi;
 				self.l = lo;
+			}
+			Register16::SP => {
+				self.sp = value;
 			}
 		}
 	}
