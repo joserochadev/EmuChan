@@ -10,7 +10,7 @@ This is a **hobby project** to learn Rust and explore hardware emulation. The go
 ✅ Implementation of the memory bus and register mapping  
 ✅ Rendering via PPU (in development)  
 ✅ Support for the GameBoy boot ROM (in development)  
-✅ Compatibility with games and hardware tests (in development)  
+✅ Compatibility with games and hardware tests (in development)
 ✅ CLI to run the emulator, execute tests, or disassemble memory sections
 
 ## 📚 References

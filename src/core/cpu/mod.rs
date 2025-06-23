@@ -94,16 +94,23 @@ impl CPU {
 		data
 	}
 
-
-	pub fn step(&mut self) -> Result<(), String> {
+	pub fn step(&mut self) -> u32 {
 		let instruction = self.fetch();
 		let mut opcode = Opcode::new(self);
 
-		match opcode.decode(instruction) {
-			Err(e) => return Err(format!("ERROR: {}", e)),
-			Ok(_) => return Ok(()),
-		}
+		opcode.decode(instruction).unwrap();
+
+		return self.cycles as u32;
 	}
+	// pub fn step(&mut self) -> Result<(), String> {
+	// 	let instruction = self.fetch();
+	// 	let mut opcode = Opcode::new(self);
+
+	// 	match opcode.decode(instruction) {
+	// 		Err(e) => return Err(format!("ERROR: {}", e)),
+	// 		Ok(_) => return Ok(()),
+	// 	}
+	// }
 }
 
 impl fmt::Display for CPU {
