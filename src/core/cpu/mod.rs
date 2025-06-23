@@ -55,7 +55,7 @@ impl CPU {
 	}
 
 	pub fn set_cycles(&mut self, t_cycles: usize) {
-		self.cycles = t_cycles / 4; // convert to M-Cycles
+		self.cycles = t_cycles;
 	}
 
 	pub fn fetch(&mut self) -> u8 {
@@ -94,23 +94,15 @@ impl CPU {
 		data
 	}
 
-	pub fn step(&mut self) -> u32 {
+	pub fn step(&mut self) -> Result<u32, String> {
 		let instruction = self.fetch();
 		let mut opcode = Opcode::new(self);
 
-		opcode.decode(instruction).unwrap();
-
-		return self.cycles as u32;
+		match opcode.decode(instruction) {
+			Err(e) => return Err(format!("ERROR: {}", e)),
+			Ok(_) => return Ok(self.cycles as u32),
+		}
 	}
-	// pub fn step(&mut self) -> Result<(), String> {
-	// 	let instruction = self.fetch();
-	// 	let mut opcode = Opcode::new(self);
-
-	// 	match opcode.decode(instruction) {
-	// 		Err(e) => return Err(format!("ERROR: {}", e)),
-	// 		Ok(_) => return Ok(()),
-	// 	}
-	// }
 }
 
 impl fmt::Display for CPU {

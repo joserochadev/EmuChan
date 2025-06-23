@@ -155,9 +155,19 @@ impl EmuChan {
 			// Supondo que cpu.step() retorna os T-ciclos da instrução
 			let cycles_executed = {
 				let mut cpu = self.cpu.lock().unwrap();
-				cpu.step()
+				match cpu.step() {
+					
+					Err(e) => {
+						*self.emulation_state.lock().unwrap() = EmulationState::PAUSED;
+						println!("EmuChan is PAUSED.");
+						println!("{}\n{}", e, cpu);
+						break;
+
+					},
+					Ok(cycles) => cycles
+				}
 			};
-			cycles_this_frame += cycles_executed * 4; // os ciclos da cpu estao eu m-cycles entao  eu converto em t-cycles
+			cycles_this_frame += cycles_executed; // os ciclos da cpu estao eu m-cycles entao  eu converto em t-cycles
 
 			// A PPU avança o mesmo número de "pontos" (dots) que os T-ciclos da CPU
 			// Supondo que ppu.step() avança um "ponto"
