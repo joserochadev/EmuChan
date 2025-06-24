@@ -1,3 +1,5 @@
+use crate::gui::common::dialog;
+
 use crate::emuchan::{EmuChan, EmulationState};
 use eframe::egui;
 use std::path::PathBuf;
@@ -98,19 +100,7 @@ impl eframe::App for EmuChanGui {
 			egui::menu::bar(ui, |ui| {
 				ui.menu_button("File", |ui| {
 					if ui.button("load rom...").clicked() {
-						let current_directory = std::env::current_dir().unwrap_or_else(|_| ".".into());
-						let sender_clone = self.rom_path_sender.clone();
-
-						std::thread::spawn(move || {
-							let file_dialog = rfd::FileDialog::new()
-								.add_filter("Game Boy ROM", &["gb"])
-								.set_directory(&current_directory);
-
-							if let Some(path) = file_dialog.pick_file() {
-								let _ = sender_clone.send(path);
-							}
-						});
-
+						dialog::open_rom_dialog(self.rom_path_sender.clone());
 						ui.close_menu();
 					}
 
@@ -156,3 +146,4 @@ impl eframe::App for EmuChanGui {
 		ctx.request_repaint();
 	}
 }
+
