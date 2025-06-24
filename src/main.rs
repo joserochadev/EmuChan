@@ -6,7 +6,7 @@ mod gui;
 // mod tests;
 mod ui;
 
-use common::disassembler::{disassemble, parse_from_file};
+// use common::disassembler::{disassemble, parse_from_file};
 
 use eframe::egui;
 // use tests::sm83::SM83;
@@ -110,15 +110,14 @@ fn main() -> Result<(), eframe::Error> {
 	env_logger::init(); // Initialize logger
 
 	let options = eframe::NativeOptions {
+		centered: true,
 		viewport: egui::ViewportBuilder::default()
-			.with_inner_size([800.0, 650.0])
+			.with_inner_size([640.0, 600.0])
 			.with_title("EmuChan"),
 		..Default::default()
 	};
 
-	// Inicializa o Model (emulador)
-	let emu_model = Arc::new(Mutex::new(EmuChan::new(None)));
+	let emu_model = Arc::new(Mutex::new(EmuChan::new()));
 
-	// Roda a aplicação eframe, passando o model para a nossa struct GuiApp
 	eframe::run_native("EmuChan", options, Box::new(|_cc| Ok(Box::new(EmuChanGui::new(emu_model)))))
 }

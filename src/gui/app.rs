@@ -1,20 +1,33 @@
-use crate::gui::common::dialog;
-
 use crate::emuchan::{EmuChan, EmulationState};
 use eframe::egui;
 use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 
+use crate::gui::common::dialog;
+use crate::gui::common::palettes::{self, ColorPalette};
+use crate::gui::common::window_scale::WindowScale;
+
 pub struct EmuChanGui {
 	emulator: Arc<Mutex<EmuChan>>,
-
 	emulator_texture: Option<egui::TextureHandle>,
 	displayed_title: String,
-
 	rom_path_sender: Sender<PathBuf>,
 	rom_path_receiver: Receiver<PathBuf>,
+	selected_palette: ColorPalette,
+	window_scale: WindowScale,
+}
 
+impl eframe::App for EmuChanGui {
+	fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+		self.handle_logic(ctx);
+
+		self.ui_top_painel(ctx);
+		self.ui_central_painel(ctx);
+		self.ui_bottom_painel(ctx);
+
+		ctx.request_repaint();
+	}
 }
 
 impl EmuChanGui {
@@ -27,16 +40,13 @@ impl EmuChanGui {
 			displayed_title: "EmuChan".to_string(),
 			rom_path_sender: sender,
 			rom_path_receiver: receiver,
+			selected_palette: ColorPalette::Classic,
+			window_scale: WindowScale::X4,
 		}
 	}
 
 	fn update_emulator_texture(&mut self, ctx: &egui::Context) {
-		const GAMEBOY_PALETTE: [egui::Color32; 4] = [
-			egui::Color32::from_rgb(155, 188, 15), // Lightest Green
-			egui::Color32::from_rgb(139, 172, 15), // Light Green
-			egui::Color32::from_rgb(48, 98, 48),   // Dark Green
-			egui::Color32::from_rgb(15, 56, 15),   // Darkest Green
-		];
+		let pallete = palettes::get_colors(self.selected_palette);
 
 		let emulator = self.emulator.lock().unwrap();
 
@@ -44,15 +54,11 @@ impl EmuChanGui {
 
 		let color_buffer: Vec<egui::Color32> = video_buffer
 			.iter()
-			.map(|&pixel_index| GAMEBOY_PALETTE[pixel_index as usize])
+			.map(|&pixel_index| pallete[pixel_index as usize])
 			.collect();
 
 		let rgba_buffer: Vec<u8> = color_buffer.iter().flat_map(|c| c.to_array()).collect();
-
 		let image = egui::ColorImage::from_rgba_unmultiplied([160, 144], &rgba_buffer);
-
-		// let texture = ctx.load_texture("emulator_screen", image, egui::TextureOptions::NEAREST);
-		// self.emulator_texture = Some(texture);
 
 		if let Some(texture) = &mut self.emulator_texture {
 			texture.set(image, egui::TextureOptions::NEAREST);
@@ -61,41 +67,23 @@ impl EmuChanGui {
 				Some(ctx.load_texture("emulator_screen", image, egui::TextureOptions::NEAREST));
 		}
 	}
-}
 
-impl eframe::App for EmuChanGui {
-	fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+	fn handle_logic(&mut self, ctx: &egui::Context) {
 		if let Ok(path) = self.rom_path_receiver.try_recv() {
 			println!("Selected ROM: {}", path.display());
 
 			let mut emulator = self.emulator.lock().unwrap();
 			emulator.load_rom(path.to_string_lossy().to_string());
-
 			*emulator.emulation_state.lock().unwrap() = EmulationState::RUNNING;
 		}
 
 		self.emulator.lock().unwrap().run_one_frame();
-
 		self.update_emulator_texture(ctx);
 
-		let new_title = {
-			let emulator = self.emulator.lock().unwrap();
-			let game_title = emulator.get_game_title();
+		self.update_window_title(ctx);
+	}
 
-			let clean_title = game_title.trim_matches(char::from(0));
-
-			if clean_title.is_empty() {
-				"EmuChan".to_string()
-			} else {
-				format!("EmuChan - {}", clean_title)
-			}
-		};
-
-		if self.displayed_title != new_title {
-			self.displayed_title = new_title.clone();
-			ctx.send_viewport_cmd(egui::ViewportCommand::Title(self.displayed_title.clone()));
-		}
-
+	fn ui_top_painel(&mut self, ctx: &egui::Context) {
 		egui::TopBottomPanel::top("top_painel").show(ctx, |ui| {
 			egui::menu::bar(ui, |ui| {
 				ui.menu_button("File", |ui| {
@@ -110,9 +98,60 @@ impl eframe::App for EmuChanGui {
 						ctx.send_viewport_cmd(egui::ViewportCommand::Close);
 					}
 				});
+
+				ui.menu_button("Emulation", |ui| {
+					ui.menu_button("Video", |ui| {
+						ui.menu_button("Color Pallete", |ui| {
+							ui.radio_value(&mut self.selected_palette, ColorPalette::Default, "Default");
+							ui.radio_value(&mut self.selected_palette, ColorPalette::Classic, "Classic Green");
+							ui.radio_value(&mut self.selected_palette, ColorPalette::Greyscale, "Greyscale");
+							ui.radio_value(&mut self.selected_palette, ColorPalette::Chocolate, "Chocolate");
+						});
+						ui.separator();
+						ui.menu_button("Resolution", |ui| {
+							ui.radio_value(&mut self.window_scale, WindowScale::X1, "1x (160 x 144)");
+							ui.radio_value(&mut self.window_scale, WindowScale::X2, "2x (320 x 288)");
+							ui.radio_value(&mut self.window_scale, WindowScale::X3, "3x (480 x 432)");
+							ui.radio_value(&mut self.window_scale, WindowScale::X4, "4x (640 x 576)");
+						});
+					});
+				})
 			});
 		});
+	}
 
+	fn ui_central_painel(&mut self, ctx: &egui::Context) {
+		let frame = egui::Frame {
+        inner_margin: egui::Margin::same(0),
+        fill: egui::Color32::TRANSPARENT,        
+        ..Default::default()
+    };
+
+		egui::CentralPanel::default().frame(frame).show(ctx, |ui| {
+				if self.emulator_texture.is_none() {
+					self.update_emulator_texture(ctx);
+				}
+
+				ui.with_layout(egui::Layout::centered_and_justified(egui::Direction::TopDown), |ui| {
+            if let Some(texture) = &self.emulator_texture {
+							let scale_factor = self.window_scale.as_factor();
+                let available_size = ui.available_size();
+                let scaled_width = 160.0 * scale_factor;
+                let scaled_height = 144.0 * scale_factor;
+
+                let final_size = egui::vec2(
+                    scaled_width.min(available_size.x),
+                    scaled_height.min(available_size.y)
+                );
+
+                let image = egui::Image::new(texture).fit_to_exact_size(final_size);
+                ui.add(image);
+            }
+        });
+		});
+	}
+
+	fn ui_bottom_painel(&mut self, ctx: &egui::Context) {
 		egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
 			ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
 				let emulator = self.emulator.lock().unwrap();
@@ -124,26 +163,26 @@ impl eframe::App for EmuChanGui {
 				ui.label(format!("FPS: {:.1}", emu_fps));
 			});
 		});
+	}
 
-		egui::CentralPanel::default().show(ctx, |ui| {
-			egui::Frame::dark_canvas(ui.style()).show(ui, |ui| {
-				if self.emulator_texture.is_none() {
-					self.update_emulator_texture(ctx);
-				}
+	fn update_window_title(&mut self, ctx: &egui::Context) {
+		let new_title = {
+			let emulator = self.emulator.lock().unwrap();
+			let game_title = emulator
+				.get_game_title()
+				.trim_matches(char::from(0))
+				.to_string();
 
-				if let Some(texture) = &self.emulator_texture {
-					let desired_size = egui::vec2(160.0 * 4.0, 144.0 * 4.0);
+			if game_title.is_empty() {
+				"EmuChan".to_string()
+			} else {
+				format!("EmuChan - {}", game_title)
+			}
+		};
 
-					let emu_screen_image = egui::Image::new(texture);
-
-					let sized_image = emu_screen_image.fit_to_exact_size(desired_size);
-
-					ui.add(sized_image);
-				}
-			});
-		});
-
-		ctx.request_repaint();
+		if self.displayed_title != new_title {
+			self.displayed_title = new_title.clone();
+			ctx.send_viewport_cmd(egui::ViewportCommand::Title(self.displayed_title.clone()));
+		}
 	}
 }
-
