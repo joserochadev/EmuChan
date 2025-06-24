@@ -1,10 +1,11 @@
 use crate::emuchan::{EmuChan, EmulationState};
+use crate::tests::sm83::SM83;
 use eframe::egui;
 use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 
-use crate::gui::common::dialog;
+use crate::gui::common::dialog::{self, open_json_test_dialog};
 use crate::gui::common::palettes::{self, ColorPalette};
 use crate::gui::common::window_scale::WindowScale;
 
@@ -16,6 +17,10 @@ pub struct EmuChanGui {
 	rom_path_receiver: Receiver<PathBuf>,
 	selected_palette: ColorPalette,
 	window_scale: WindowScale,
+	test_result_sender: Sender<String>,
+	test_result_receiver: Receiver<String>,
+	test_log: Vec<String>,
+	show_test_runner_window: bool,
 }
 
 impl eframe::App for EmuChanGui {
@@ -33,6 +38,7 @@ impl eframe::App for EmuChanGui {
 impl EmuChanGui {
 	pub fn new(emulator: Arc<Mutex<EmuChan>>) -> Self {
 		let (sender, receiver) = channel();
+		let (test_sender, test_receiver) = channel();
 
 		Self {
 			emulator,
@@ -42,6 +48,10 @@ impl EmuChanGui {
 			rom_path_receiver: receiver,
 			selected_palette: ColorPalette::Classic,
 			window_scale: WindowScale::X4,
+			test_result_sender: test_sender,
+			test_result_receiver: test_receiver,
+			test_log: Vec::new(),
+			show_test_runner_window: false,
 		}
 	}
 
@@ -69,6 +79,10 @@ impl EmuChanGui {
 	}
 
 	fn handle_logic(&mut self, ctx: &egui::Context) {
+		if let Ok(log_message) = self.test_result_receiver.try_recv() {
+			self.test_log.push(log_message);
+		}
+
 		if let Ok(path) = self.rom_path_receiver.try_recv() {
 			println!("Selected ROM: {}", path.display());
 
@@ -81,6 +95,10 @@ impl EmuChanGui {
 		self.update_emulator_texture(ctx);
 
 		self.update_window_title(ctx);
+
+		if self.show_test_runner_window {
+			self.ui_test_runner_window(ctx);
+		}
 	}
 
 	fn ui_top_painel(&mut self, ctx: &egui::Context) {
@@ -115,39 +133,44 @@ impl EmuChanGui {
 							ui.radio_value(&mut self.window_scale, WindowScale::X4, "4x (640 x 576)");
 						});
 					});
-				})
+				});
+
+				ui.menu_button("Developer", |ui| {
+					if ui.button("SM83 Test").clicked() {
+						self.show_test_runner_window = true;
+						ui.close_menu();
+					}
+				});
 			});
 		});
 	}
 
 	fn ui_central_painel(&mut self, ctx: &egui::Context) {
 		let frame = egui::Frame {
-        inner_margin: egui::Margin::same(0),
-        fill: egui::Color32::TRANSPARENT,        
-        ..Default::default()
-    };
+			inner_margin: egui::Margin::same(0),
+			fill: egui::Color32::TRANSPARENT,
+			..Default::default()
+		};
 
 		egui::CentralPanel::default().frame(frame).show(ctx, |ui| {
-				if self.emulator_texture.is_none() {
-					self.update_emulator_texture(ctx);
+			if self.emulator_texture.is_none() {
+				self.update_emulator_texture(ctx);
+			}
+
+			ui.with_layout(egui::Layout::centered_and_justified(egui::Direction::TopDown), |ui| {
+				if let Some(texture) = &self.emulator_texture {
+					let scale_factor = self.window_scale.as_factor();
+					let available_size = ui.available_size();
+					let scaled_width = 160.0 * scale_factor;
+					let scaled_height = 144.0 * scale_factor;
+
+					let final_size =
+						egui::vec2(scaled_width.min(available_size.x), scaled_height.min(available_size.y));
+
+					let image = egui::Image::new(texture).fit_to_exact_size(final_size);
+					ui.add(image);
 				}
-
-				ui.with_layout(egui::Layout::centered_and_justified(egui::Direction::TopDown), |ui| {
-            if let Some(texture) = &self.emulator_texture {
-							let scale_factor = self.window_scale.as_factor();
-                let available_size = ui.available_size();
-                let scaled_width = 160.0 * scale_factor;
-                let scaled_height = 144.0 * scale_factor;
-
-                let final_size = egui::vec2(
-                    scaled_width.min(available_size.x),
-                    scaled_height.min(available_size.y)
-                );
-
-                let image = egui::Image::new(texture).fit_to_exact_size(final_size);
-                ui.add(image);
-            }
-        });
+			});
 		});
 	}
 
@@ -184,5 +207,34 @@ impl EmuChanGui {
 			self.displayed_title = new_title.clone();
 			ctx.send_viewport_cmd(egui::ViewportCommand::Title(self.displayed_title.clone()));
 		}
+	}
+
+	fn ui_test_runner_window(&mut self, ctx: &egui::Context) {
+		egui::Window::new("SM83 CPU Tests")
+			.open(&mut self.show_test_runner_window)
+			.show(ctx, |ui| {
+				if ui.button("Select Json Test").clicked() {
+					// Dispara a lógica para abrir o diálogo de arquivo
+					open_json_test_dialog(self.test_result_sender.clone());
+				}
+
+				ui.separator(); // Linha divisória
+
+				// Área de scroll para exibir os resultados do teste
+				ui.heading("Test Results:");
+				egui::Frame::dark_canvas(ui.style()).show(ui, |ui| {
+					ui.set_min_size(egui::vec2(300.0, 100.0));
+					egui::ScrollArea::vertical()
+					.stick_to_bottom(true) // Faz o scroll ir para o final automaticamente
+					.show(ui, |ui| {
+						ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
+							for message in &self.test_log {
+									// Usamos um `monospace` para um visual de log mais tradicional
+								ui.label(egui::RichText::new(message).monospace());
+							}
+						});
+					});
+				});
+			});
 	}
 }

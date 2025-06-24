@@ -172,7 +172,7 @@ impl SM83 {
 			&& expected.l == actual.l
 	}
 
-	pub fn run_test(&mut self, file_path: String) {
+	pub fn run_test(&mut self, file_path: String) -> Result<(), String> {
 		let snapshots = load_json_test(file_path);
 
 		for snapshot in snapshots {
@@ -184,22 +184,31 @@ impl SM83 {
 			}
 
 			if let Err(e) = self.cpu.step() {
-				panic!("{}", e);
+				return Err(format!("CPU step error on test '{}': {}", snapshot.name, e));
 			}
 
 			if self.compare_state(&snapshot.final_) {
 				let m = format!("Test: {} OK", snapshot.name);
-				println!("{}\n", m.bold().green());
+				// println!("{}\n", m.bold().green());
 			} else {
-				let m = format!("Test: {} FAILED", snapshot.name);
-				println!("{}\n", m.bold().red());
+				// let m = format!("Test: {} FAILED", snapshot.name);
+				// println!("{}\n", m.bold().red());
 
-				println!("Snapshot Final:\n{}", snapshot);
-				println!("CPU Final State:\n{}", self.cpu);
+				// println!("Snapshot Final:\n{}", snapshot);
+				// println!("CPU Final State:\n{}", self.cpu);
 
-				panic!("{}\n", m.bold().red());
+				// panic!("{}\n", m.bold().red());
+				let error_report = format!(
+					"Test FAILED: {}\n\nExpected:\n{}\n\nGot:\n{}",
+					snapshot.name,
+					snapshot.final_, // Usa o `impl Display for RegisteState`
+					self.retrive()   // Pega o estado atual para comparação
+				);
+				return Err(error_report);
 			}
 		}
+
+		return Ok(());
 	}
 }
 

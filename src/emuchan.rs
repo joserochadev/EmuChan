@@ -51,7 +51,6 @@ impl EmuChan {
 		let cartridge = Arc::new(Mutex::new(Cartridge::new()));
 		let emulation_state = Arc::new(Mutex::new(EmulationState::PAUSED));
 
-
 		{
 			let mut bus = bus.lock().unwrap();
 
@@ -112,7 +111,7 @@ impl EmuChan {
 				}
 			};
 
-			cycles_this_frame += cycles_executed; 
+			cycles_this_frame += cycles_executed;
 
 			let mut ppu = self.ppu.lock().unwrap();
 			for _ in 0..cycles_executed {

@@ -3,7 +3,7 @@ mod config;
 mod core;
 mod emuchan;
 mod gui;
-// mod tests;
+mod tests;
 mod ui;
 
 // use common::disassembler::{disassemble, parse_from_file};
