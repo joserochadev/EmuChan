@@ -1,7 +1,8 @@
 #![warn(dead_code)]
 use std::sync::{Arc, Mutex};
 
-use crate::{ppu::PPU, utils::config::SCREEN_SIZE};
+use crate::config::SCREEN_SIZE;
+use crate::core::ppu::PPU;
 use sdl2::{event::Event, pixels::Color, rect::Rect};
 
 const COLOR_PALLET: [Color; 4] = [
@@ -34,8 +35,8 @@ impl UI {
 		let screen_width = display_bounds.width();
 		let screen_height = display_bounds.height();
 
-		let main_width = SCREEN_SIZE.0 as u32;
-		let main_height = SCREEN_SIZE.1 as u32;
+		let main_width = SCREEN_SIZE.width;
+		let main_height = SCREEN_SIZE.height;
 		let debug_width = 16 * 8 * 3;
 		let debug_height = main_height;
 

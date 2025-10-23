@@ -1,13 +1,12 @@
 #![allow(dead_code)]
-use crate::bus::BUS;
-use crate::cartridge::Cartridge;
-use crate::cpu::{Register, CPU};
-use crate::ppu::PPU;
-use crate::ui::UI;
-use crate::utils::boot::BOOT_DMG;
+use crate::common::boot::BOOT_DMG;
+use crate::core::bus::BUS;
+use crate::core::cartridge::Cartridge;
+use crate::core::cpu::CPU;
+use crate::core::ppu::PPU;
 
 use std::sync::{Arc, Mutex};
-use std::thread;
+use std::time::Instant;
 
 #[derive(Default, Clone, PartialEq)]
 pub enum EmulationState {
@@ -26,7 +25,6 @@ pub struct EmuStateFlags {
 }
 
 pub struct EmuState {
-	pub registers: Register,
 	pub flags: EmuStateFlags,
 	pub emulation_state: EmulationState,
 }
@@ -36,19 +34,22 @@ pub struct EmuChan {
 	pub cpu: Arc<Mutex<CPU>>,
 	pub ppu: Arc<Mutex<PPU>>,
 	pub cartridge: Arc<Mutex<Cartridge>>,
-	pub ui: UI,
 	pub emulation_state: Arc<Mutex<EmulationState>>,
+
+	frame_count: u32,
+	last_fps_check: Instant,
+	pub emu_fps: f64, //
+
+	pub emu_speed_percent: f64,
 }
 
 impl EmuChan {
-	pub fn new(rom_path: Option<String>) -> Self {
+	pub fn new() -> Self {
 		let bus = Arc::new(Mutex::new(BUS::new()));
 		let cpu = Arc::new(Mutex::new(CPU::new(Arc::clone(&bus))));
 		let ppu = Arc::new(Mutex::new(PPU::new()));
 		let cartridge = Arc::new(Mutex::new(Cartridge::new()));
-		let emulation_state = Arc::new(Mutex::new(EmulationState::RUNNING));
-
-		let mut ui = UI::new(Arc::clone(&ppu));
+		let emulation_state = Arc::new(Mutex::new(EmulationState::PAUSED));
 
 		{
 			let mut bus = bus.lock().unwrap();
@@ -59,24 +60,6 @@ impl EmuChan {
 			bus.ppu_connect(Arc::clone(&ppu));
 			// Load boot in memory
 			bus.memory[0..=255].copy_from_slice(&BOOT_DMG);
-			// Simulating v-blank period
-			// bus.write(0xFF44, 0x90);
-		}
-
-		{
-			let mut cart = cartridge.lock().unwrap();
-
-			// Load ROM
-			if let Some(rom) = rom_path {
-				cart.load_rom(rom);
-			}
-
-			// Remove null bytes
-			let game_title = cart.game_title.trim_end_matches('\0');
-			let new_window_title = format!("EmuChan - {}", game_title);
-
-			// Set window title with game name
-			ui.main_window.set_title(&new_window_title).unwrap();
 		}
 
 		Self {
@@ -84,45 +67,70 @@ impl EmuChan {
 			cpu,
 			ppu,
 			cartridge,
-			ui,
 			emulation_state,
+			frame_count: 0,
+			last_fps_check: Instant::now(),
+			emu_fps: 0.0,
+			emu_speed_percent: 0.0,
 		}
 	}
 
-	pub fn run(&mut self) {
-		let cpu_clone = Arc::clone(&self.cpu);
-		let ppu_clone = Arc::clone(&self.ppu);
-		let emulation_state_clone = Arc::clone(&self.emulation_state);
+	pub fn load_rom(&mut self, path: String) {
+		let mut cartridge = self.cartridge.lock().unwrap();
 
-		thread::spawn(move || {
-			let mut emulation_state = emulation_state_clone.lock().unwrap();
-			while *emulation_state == EmulationState::RUNNING {
-				// CPU step
-				let mut cpu = cpu_clone.lock().unwrap();
-				if let Err(e) = cpu.step() {
-					*emulation_state = EmulationState::PAUSED;
-					println!("EmuChan is PAUSED.");
-					println!("{}\n{}", e, cpu);
-				}
+		cartridge.load_rom(path);
+	}
 
-				// PPU step
-				let mut ppu = ppu_clone.lock().unwrap();
-				for _ in 0..cpu.cycles {
-					for _ in 0..4 {
-						ppu.step();
+	pub fn get_game_title(&self) -> String {
+		self.cartridge.lock().unwrap().game_title.clone()
+	}
+
+	pub fn get_video_buffer(&self) -> Vec<u8> {
+		let ppu = self.ppu.lock().unwrap();
+		return ppu.video_buffer.to_vec();
+	}
+
+	pub fn run_one_frame(&mut self) {
+		if *self.emulation_state.lock().unwrap() != EmulationState::RUNNING {
+			return;
+		}
+		const CYCLES_PER_FRAME: u32 = 70224; // ~70k T-cycles per frame
+		let mut cycles_this_frame = 0;
+
+		while cycles_this_frame < CYCLES_PER_FRAME {
+			let cycles_executed = {
+				let mut cpu = self.cpu.lock().unwrap();
+				match cpu.step() {
+					Err(e) => {
+						*self.emulation_state.lock().unwrap() = EmulationState::PAUSED;
+						println!("EmuChan is PAUSED.");
+						println!("{}\n{}", e, cpu);
+						break;
 					}
+					Ok(cycles) => cycles,
 				}
+			};
+
+			cycles_this_frame += cycles_executed;
+
+			let mut ppu = self.ppu.lock().unwrap();
+			for _ in 0..cycles_executed {
+				ppu.step();
 			}
-		});
+		}
 
-		self.ui.run();
+		// Calc FPS and Speed
+		const TARGET_FPS: f64 = 59.7275;
+		self.frame_count += 1;
 
-		// self.ppu.lock().unwrap()._dump_oam(0xfe00, 0xfe9f);
-		// self.ppu.lock().unwrap()._dump_vram(0x8000, 0x9fff);
-		// println!("{}", self.ppu.lock().unwrap());
-		print!("{}", self.cpu.lock().unwrap());
-		// println!("{:?}", self.bus.lock().unwrap()._dump_hram());
+		let elapsed = self.last_fps_check.elapsed();
 
-		// println!("{:?}", self.ppu.lock().unwrap().show_video_buffer());
+		if elapsed.as_secs_f64() >= 1.0 {
+			self.emu_fps = self.frame_count as f64 / elapsed.as_secs_f64();
+			self.emu_speed_percent = (self.emu_fps / TARGET_FPS) * 100.0;
+
+			self.frame_count = 0;
+			self.last_fps_check = Instant::now();
+		}
 	}
 }

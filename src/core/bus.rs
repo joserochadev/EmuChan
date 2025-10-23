@@ -3,7 +3,8 @@ use log::debug;
 
 use std::sync::{Arc, Mutex};
 
-use crate::{cartridge::Cartridge, ppu::PPU};
+use crate::core::cartridge::Cartridge;
+use crate::core::ppu::PPU;
 
 /*
 +-------+-------+---------------------------------+-----------------------------------------------------+
