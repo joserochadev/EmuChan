@@ -5,7 +5,7 @@ use std::{
 };
 
 mod opcodes;
-mod register;
+pub mod register;
 
 use opcodes::Opcode;
 use register::{Flags, Register};
@@ -99,7 +99,7 @@ impl CPU {
 		let mut opcode = Opcode::new(self);
 
 		match opcode.decode(instruction) {
-			Err(e) => return Err(format!("ERROR: {}", e)),
+			Err(e) => return Err(format!("{}", e)),
 			Ok(_) => return Ok(self.cycles as u32),
 		}
 	}

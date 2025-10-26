@@ -1,7 +1,10 @@
 mod common;
 mod config;
 mod core;
+mod debug;
 mod emuchan;
+// mod emulator_bridge;
+// mod emulator_thread;
 mod gui;
 mod tests;
 mod ui;
@@ -117,7 +120,7 @@ fn main() -> Result<(), eframe::Error> {
 		..Default::default()
 	};
 
-	let emu_model = Arc::new(Mutex::new(EmuChan::new()));
+	// let emu_model = Arc::new(Mutex::new(EmuChan::new()));
 
-	eframe::run_native("EmuChan", options, Box::new(|_cc| Ok(Box::new(EmuChanGui::new(emu_model)))))
+	eframe::run_native("EmuChan", options, Box::new(|_cc| Ok(Box::new(EmuChanGui::new()))))
 }
