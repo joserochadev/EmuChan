@@ -13,7 +13,6 @@ dependencies = [
  "env_logger",
  "log",
  "rfd",
- "sdl2",
  "serde",
  "serde_json",
 ]

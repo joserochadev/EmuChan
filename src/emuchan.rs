@@ -2,36 +2,29 @@
 use crate::common::boot::BOOT_DMG;
 use crate::core::bus::BUS;
 use crate::core::cartridge::Cartridge;
+use crate::core::cpu::register::Flags;
 use crate::core::cpu::{register::Register, CPU};
 // use crate::core::cpu::register
 use crate::core::ppu::PPU;
-use crate::debug::messages::{EmulatorCommand, EmulatorEvent, EmulatorState};
+use crate::debug::debugger::Debugger;
+use crate::debug::disassembler::Disassembler;
+use crate::debug::messages::{
+	CpuDebugState, DebugCommand, DebugEvent, DisassemblyView, EmulatorCommand, EmulatorEvent,
+	EmulatorState,
+};
+use crate::tests::sm83::SM83;
 
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-// #[derive(Default, Clone, PartialEq)]
-// pub enum EmulationState {
-// 	#[default]
-// 	PAUSED,
-// 	RUNNING,
-// 	STEP,
-// }
-
-// #[derive(Default)]
-// pub struct EmuStateFlags {
-// 	pub z: bool,
-// 	pub h: bool,
-// 	pub n: bool,
-// 	pub c: bool,
-// }
-
-// pub struct EmuState {
-// 	pub flags: EmuStateFlags,
-// 	pub emulation_state: EmulationState,
-// }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StepMode {
+	None,
+	Instruction,
+	Frame,
+}
 
 pub struct EmuChan {
 	pub bus: Arc<Mutex<BUS>>,
@@ -45,6 +38,10 @@ pub struct EmuChan {
 	last_fps_check: Instant,
 	pub emu_fps: f64,
 	pub emu_speed_percent: f64,
+
+	debugger: Debugger,
+
+	step_mode: StepMode,
 
 	pub command_rx: Receiver<EmulatorCommand>,
 	pub event_tx: Sender<EmulatorEvent>,
@@ -78,6 +75,8 @@ impl EmuChan {
 			last_fps_check: Instant::now(),
 			emu_fps: 0.0,
 			emu_speed_percent: 0.0,
+			debugger: Debugger::new(),
+			step_mode: StepMode::None,
 			command_rx,
 			event_tx,
 		}
@@ -128,6 +127,184 @@ impl EmuChan {
 				EmulatorCommand::JoypadInput(button, is_pressed) => {
 					todo!()
 				}
+
+				EmulatorCommand::Debug(debug_cmd) => {
+					self.process_debug_command(debug_cmd);
+				}
+			}
+		}
+	}
+
+	fn process_debug_command(&mut self, cmd: DebugCommand) {
+		match cmd {
+			DebugCommand::AddBreakpoint(addr) => {
+				self.debugger.add_breakpoint(addr);
+				let bps = self.debugger.get_breakpoints();
+				let _ = self
+					.event_tx
+					.send(EmulatorEvent::Debug(DebugEvent::BreakpointUpdated(bps)));
+			}
+
+			DebugCommand::RemoveBreakpoint(addr) => {
+				self.debugger.remove_breakpoint(addr);
+				let bps = self.debugger.get_breakpoints();
+				let _ = self
+					.event_tx
+					.send(EmulatorEvent::Debug(DebugEvent::BreakpointUpdated(bps)));
+			}
+
+			DebugCommand::ClearBreakpoints => {
+				self.debugger.clear_breakpoints();
+				let _ = self
+					.event_tx
+					.send(EmulatorEvent::Debug(DebugEvent::BreakpointUpdated(vec![])));
+			}
+
+			DebugCommand::ToggleBreakpoint(addr) => {
+				self.debugger.toggle_breakpoint(addr);
+				let bps = self.debugger.get_breakpoints();
+				let _ = self
+					.event_tx
+					.send(EmulatorEvent::Debug(DebugEvent::BreakpointUpdated(bps)));
+			}
+
+			DebugCommand::RequestCpuState => {
+				let cpu = self.cpu.lock().unwrap();
+				let state = CpuDebugState {
+					a: cpu.reg.a,
+					b: cpu.reg.b,
+					c: cpu.reg.c,
+					d: cpu.reg.d,
+					e: cpu.reg.e,
+					f: cpu.reg.f,
+					h: cpu.reg.h,
+					l: cpu.reg.l,
+					pc: cpu.reg.pc,
+					sp: cpu.reg.sp,
+					flag_c: cpu.reg.get_flag(Flags::C) == 1,
+					flag_h: cpu.reg.get_flag(Flags::H) == 1,
+					flag_n: cpu.reg.get_flag(Flags::N) == 1,
+					flag_z: cpu.reg.get_flag(Flags::Z) == 1,
+					ime: cpu.reg.ime,
+					total_cycles: cpu.cycles,
+				};
+
+				let _ = self
+					.event_tx
+					.send(EmulatorEvent::Debug(DebugEvent::CpuState(state)));
+			}
+
+			DebugCommand::RequestDisassembly { pc, before, after } => {
+				let bus = self.bus.lock().unwrap();
+				let start_addr = pc.saturating_sub((before * 3) as u16);
+				let instructions =
+					Disassembler::disassemble_range(&bus.memory, start_addr, before + after + 1);
+
+				let view = DisassemblyView {
+					current_pc: pc,
+					instructions,
+				};
+
+				let _ = self
+					.event_tx
+					.send(EmulatorEvent::Debug(DebugEvent::DisassemblyUpdate(view)));
+			}
+
+			DebugCommand::ReadMemory(addr, count) => {
+				let bus = self.bus.lock().unwrap();
+				let end = (addr as usize + count).min(bus.memory.len());
+				let data = bus.memory[addr as usize..end].to_vec();
+
+				let _ = self
+					.event_tx
+					.send(EmulatorEvent::Debug(DebugEvent::MemoryRead {
+						address: addr,
+						data,
+					}));
+			}
+
+			DebugCommand::SetTrace(enabled) => {
+				self.debugger.set_trace(enabled);
+			}
+
+			DebugCommand::StepInstruction => {
+				self.step_mode = StepMode::Instruction;
+				if self.emulator_state == EmulatorState::Paused {
+					self.emulator_state = EmulatorState::Running;
+					let _ = self
+						.event_tx
+						.send(EmulatorEvent::StateChanged(EmulatorState::Running));
+				}
+			}
+
+			DebugCommand::StepFrame => {
+				self.step_mode = StepMode::Frame;
+				if self.emulator_state == EmulatorState::Paused {
+					self.emulator_state = EmulatorState::Running;
+					let _ = self
+						.event_tx
+						.send(EmulatorEvent::StateChanged(EmulatorState::Running));
+				}
+			}
+
+			DebugCommand::RunSM83Test(path) => {
+				self.run_sm83_test(path);
+			}
+
+			_ => {}
+		}
+	}
+
+	fn run_sm83_test(&mut self, path: PathBuf) {
+		let test_name = path
+			.file_name()
+			.and_then(|n| n.to_str())
+			.unwrap_or("Unknown")
+			.to_string();
+
+		let _ = self
+			.event_tx
+			.send(EmulatorEvent::Debug(DebugEvent::TestStarted {
+				test_name: test_name.clone(),
+			}));
+
+		let mut sm83 = SM83::new();
+		// Run the test
+		let result = sm83.run_test(path.to_string_lossy().to_string());
+
+		match result {
+			Ok(report) => {
+				// Send test results
+				// let _ = self
+				// 	.event_tx
+				// 	.send(EmulatorEvent::Debug(DebugEvent::TestResult {
+				// 		test_name: test_name.clone(),
+				// 		passed: true,
+				// 		message: format!(
+				// 			"Passed: {}/{} - Failed: {}",
+				// 			report.passed, report.total, report.failed
+				// 		),
+				// 	}));
+
+				// // Send individual failures
+				// for failure in report.failures {
+				// 	let _ = self
+				// 		.event_tx
+				// 		.send(EmulatorEvent::Debug(DebugEvent::TestResult {
+				// 			test_name: failure.test_name.clone(),
+				// 			passed: false,
+				// 			message: format!("Expected: {:?}, Got: {:?}", failure.expected, failure.actual),
+				// 		}));
+				// }
+			}
+			Err(e) => {
+				let _ = self
+					.event_tx
+					.send(EmulatorEvent::Debug(DebugEvent::TestResult {
+						test_name,
+						passed: false,
+						message: format!("Error: {}", e),
+					}));
 			}
 		}
 	}
@@ -201,16 +378,6 @@ impl EmuChan {
 		}
 	}
 
-	pub fn load_rom(&mut self, path: String) {
-		let mut cartridge = self.cartridge.lock().unwrap();
-
-		cartridge.load_rom(path);
-	}
-
-	pub fn get_game_title(&self) -> String {
-		self.cartridge.lock().unwrap().game_title.clone()
-	}
-
 	pub fn get_video_buffer(&self) -> Vec<u8> {
 		let ppu = self.ppu.lock().unwrap();
 		return ppu.video_buffer.to_vec();
@@ -227,8 +394,44 @@ impl EmuChan {
 		let mut cycles_this_frame = 0;
 
 		while cycles_this_frame < CYCLES_PER_FRAME {
+			let should_break = {
+				let cpu = self.cpu.lock().unwrap();
+				self.debugger.should_break(cpu.reg.pc)
+			};
+
+			if should_break {
+				let cpu = self.cpu.lock().unwrap();
+				let _ = self
+					.event_tx
+					.send(EmulatorEvent::Debug(DebugEvent::BreakpoitHit {
+						address: cpu.reg.pc,
+					}));
+
+				self.emulator_state = EmulatorState::Paused;
+				let _ = self
+					.event_tx
+					.send(EmulatorEvent::StateChanged(EmulatorState::Paused));
+
+				break;
+			}
+
 			let cycles_executed = {
 				let mut cpu = self.cpu.lock().unwrap();
+
+				if self.debugger.is_trace_enable() {
+					let pc = cpu.reg.pc;
+					let bus = self.bus.lock().unwrap();
+					let instr = Disassembler::disassemble_at(&bus.memory, pc);
+					let _ = self
+						.event_tx
+						.send(EmulatorEvent::Debug(DebugEvent::InstructionExecuted {
+							address: pc,
+							mnemonic: instr.mnemonic,
+							operands: instr.operands,
+							cycles: instr.cycles,
+						}));
+				}
+
 				match cpu.step() {
 					Err(e) => {
 						self.emulator_state = EmulatorState::Paused;
@@ -247,6 +450,28 @@ impl EmuChan {
 			for _ in 0..cycles_executed {
 				ppu.step();
 			}
+
+			match self.step_mode {
+				StepMode::Instruction => {
+					self.step_mode = StepMode::None;
+					self.emulator_state = EmulatorState::Paused;
+					let _ = self
+						.event_tx
+						.send(EmulatorEvent::StateChanged(EmulatorState::Paused));
+					break;
+				}
+
+				StepMode::Frame => {}
+				StepMode::None => {}
+			}
+		}
+
+		if self.step_mode == StepMode::Frame && cycles_this_frame >= CYCLES_PER_FRAME {
+			self.step_mode = StepMode::None;
+			self.emulator_state = EmulatorState::Paused;
+			let _ = self
+				.event_tx
+				.send(EmulatorEvent::StateChanged(EmulatorState::Paused));
 		}
 
 		self.update_fps();

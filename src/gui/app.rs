@@ -5,9 +5,12 @@ use eframe::egui;
 use crate::{
 	debug::messages::{EmulatorCommand, EmulatorEvent, EmulatorState},
 	emuchan::EmuChan,
-	gui::common::{
-		palettes::{self, ColorPalette},
-		window_scale::WindowScale,
+	gui::{
+		common::{
+			palettes::{self, ColorPalette},
+			window_scale::WindowScale,
+		},
+		debugger_window::DebuggerWindow,
 	},
 };
 
@@ -23,6 +26,8 @@ pub struct EmuChanGui {
 
 	pallete: ColorPalette,
 	window_scale: WindowScale,
+
+	debugger_window: DebuggerWindow,
 }
 
 impl EmuChanGui {
@@ -31,6 +36,7 @@ impl EmuChanGui {
 		let (event_tx, event_rx) = channel();
 
 		let emulator = EmuChan::new(command_rx, event_tx);
+		let debugger_window = DebuggerWindow::new(command_tx.clone());
 
 		Self {
 			command_tx,
@@ -41,6 +47,7 @@ impl EmuChanGui {
 			emulator_texture: None,
 			pallete: ColorPalette::Classic,
 			window_scale: WindowScale::X4,
+			debugger_window,
 		}
 	}
 }
@@ -55,7 +62,8 @@ impl eframe::App for EmuChanGui {
 		self.ui_central_panel(ctx);
 		self.ui_bottom_painel(ctx);
 
-		// self.update_window_title(ctx, game_title);
+		// Renderiza as janelas do debugger
+		self.debugger_window.show(ctx);
 
 		ctx.request_repaint();
 	}
@@ -86,6 +94,10 @@ impl EmuChanGui {
 					ctx.send_viewport_cmd(egui::ViewportCommand::Title(new_title));
 				}
 
+				EmulatorEvent::Debug(debug_event) => {
+					self.debugger_window.handle_debug_event(debug_event);
+				}
+
 				EmulatorEvent::Error(erro) => {
 					eprintln!("Emulator error: {}", erro);
 				}
@@ -99,7 +111,7 @@ impl EmuChanGui {
 		egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
 			egui::menu::bar(ui, |ui| {
 				ui.menu_button("File", |ui| {
-					if ui.button("Load Rom").clicked() {
+					if ui.button("📂 Load Rom").clicked() {
 						if let Some(path) = rfd::FileDialog::new()
 							.add_filter("Game Boy ROM", &["gb"])
 							.pick_file()
@@ -138,6 +150,27 @@ impl EmuChanGui {
 						let _ = self.command_tx.send(EmulatorCommand::Stop);
 					}
 				});
+
+				ui.menu_button("View", |ui| {
+					ui.menu_button("Color Palette", |ui| {
+						ui.radio_value(&mut self.pallete, ColorPalette::Default, "Default");
+						ui.radio_value(&mut self.pallete, ColorPalette::Classic, "Classic Green");
+						ui.radio_value(&mut self.pallete, ColorPalette::Greyscale, "Greyscale");
+						ui.radio_value(&mut self.pallete, ColorPalette::Chocolate, "Chocolate");
+					});
+
+					ui.separator();
+
+					ui.menu_button("Resolution", |ui| {
+						ui.radio_value(&mut self.window_scale, WindowScale::X1, "1x (160 x 144)");
+						ui.radio_value(&mut self.window_scale, WindowScale::X2, "2x (320 x 288)");
+						ui.radio_value(&mut self.window_scale, WindowScale::X3, "3x (480 x 432)");
+						ui.radio_value(&mut self.window_scale, WindowScale::X4, "4x (640 x 576)");
+					});
+				});
+
+				// Menu do debugger integrado
+				self.debugger_window.show_menu(ui);
 			});
 		});
 	}
@@ -164,13 +197,18 @@ impl EmuChanGui {
 	fn ui_bottom_painel(&mut self, ctx: &egui::Context) {
 		egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
 			ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-				// let emulator = self.emulator.lock().unwrap();
 				let emu_speed = self.emulator.emu_speed_percent;
 				let emu_fps = self.emulator.emu_fps;
 
 				ui.label(format!("Speed: {:.0}%", emu_speed));
 				ui.separator();
 				ui.label(format!("FPS: {:.1}", emu_fps));
+
+				// Indicador de janelas de debug abertas
+				// if self.debugger_window.is_any_window_open() {
+				// 	ui.separator();
+				// 	ui.colored_label(egui::Color32::YELLOW, "🐛 Debug Active");
+				// }
 			});
 		});
 	}
@@ -178,7 +216,6 @@ impl EmuChanGui {
 	fn update_emulator_texture(&mut self, ctx: &egui::Context, frame: Box<Vec<u8>>) {
 		let pallete = palettes::get_colors(self.pallete);
 
-		// let video_buffer = self.emulator.get_video_buffer();
 		let video_buffer = frame;
 
 		let color_buffer: Vec<egui::Color32> = video_buffer

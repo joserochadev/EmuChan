@@ -3,11 +3,8 @@ mod config;
 mod core;
 mod debug;
 mod emuchan;
-// mod emulator_bridge;
-// mod emulator_thread;
 mod gui;
 mod tests;
-mod ui;
 
 // use common::disassembler::{disassemble, parse_from_file};
 
@@ -16,12 +13,8 @@ use eframe::egui;
 
 use clap::{Parser, Subcommand};
 use env_logger;
-use std::{
-	env,
-	sync::{Arc, Mutex},
-};
+use std::env;
 
-use emuchan::EmuChan;
 use gui::app::EmuChanGui;
 
 #[derive(Parser)]
@@ -119,8 +112,6 @@ fn main() -> Result<(), eframe::Error> {
 			.with_title("EmuChan"),
 		..Default::default()
 	};
-
-	// let emu_model = Arc::new(Mutex::new(EmuChan::new()));
 
 	eframe::run_native("EmuChan", options, Box::new(|_cc| Ok(Box::new(EmuChanGui::new()))))
 }
