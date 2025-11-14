@@ -24,6 +24,9 @@ pub struct DebuggerWindow {
 	disassembly_pc: u16,
 	disassembly_before: u16,
 	disassembly_after: u16,
+	follow_pc: bool,
+	last_pc: u16,
+	auto_scroll_disasm: bool,
 
 	// Memory
 	memory_address: String,
@@ -71,6 +74,9 @@ impl DebuggerWindow {
 			auto_scroll_trace: true,
 			test_logs: vec![],
 			auto_scroll_test: true,
+			follow_pc: true,
+			auto_scroll_disasm: true,
+			last_pc: 0,
 		}
 	}
 
@@ -121,6 +127,22 @@ impl DebuggerWindow {
 		let _ = self
 			.command_tx
 			.send(EmulatorCommand::Debug(DebugCommand::RequestCpuState));
+
+		if self.follow_pc {
+			if let Some(cpu) = &self.cpu_state {
+				if cpu.pc != self.last_pc {
+					self.last_pc = cpu.pc;
+					self.disassembly_pc = cpu.pc;
+					let _ = self
+						.command_tx
+						.send(EmulatorCommand::Debug(DebugCommand::RequestDisassembly {
+							pc: cpu.pc,
+							before: self.disassembly_before as usize,
+							after: self.disassembly_after as usize,
+						}));
+				}
+			}
+		}
 
 		// Cada janela separada
 		if self.show_registers {
@@ -327,11 +349,14 @@ impl DebuggerWindow {
 		ui.vertical(|ui| {
 			ui.label("PC:");
 			let mut pc_text = format!("{:04X}", self.disassembly_pc);
-			if ui.text_edit_singleline(&mut pc_text).changed() {
-				if let Ok(val) = u16::from_str_radix(&pc_text.trim_start_matches("0x"), 16) {
-					self.disassembly_pc = val;
+
+			ui.add_enabled_ui(!self.follow_pc, |ui| {
+				if ui.text_edit_singleline(&mut pc_text).changed() {
+					if let Ok(val) = u16::from_str_radix(&pc_text.trim_start_matches("0x"), 16) {
+						self.disassembly_pc = val;
+					}
 				}
-			}
+			});
 
 			ui.label("Before:");
 			ui.add(Slider::new(&mut self.disassembly_before, 1..=20));
@@ -339,28 +364,51 @@ impl DebuggerWindow {
 			ui.label("After:");
 			ui.add(Slider::new(&mut self.disassembly_after, 1..=20));
 
-			if ui.button("🔄 Update").clicked() {
-				let _ = self
-					.command_tx
-					.send(EmulatorCommand::Debug(DebugCommand::RequestDisassembly {
-						pc: self.disassembly_pc,
-						before: self.disassembly_before as usize,
-						after: self.disassembly_after as usize,
-					}));
-			}
+			ui.horizontal(|ui| {
+				if ui.checkbox(&mut self.follow_pc, "Follow PC").changed() {
+					if self.follow_pc {
+						// When enabling follow mode, jump to current PC
+						if let Some(cpu) = &self.cpu_state {
+							self.disassembly_pc = cpu.pc;
+							self.last_pc = cpu.pc;
+							let _ =
+								self
+									.command_tx
+									.send(EmulatorCommand::Debug(DebugCommand::RequestDisassembly {
+										pc: cpu.pc,
+										before: self.disassembly_before as usize,
+										after: self.disassembly_after as usize,
+									}));
+						}
+					}
+				}
 
-			if ui.button("➡️ Go to PC").clicked() {
-				if let Some(cpu) = &self.cpu_state {
-					self.disassembly_pc = cpu.pc;
+				ui.separator();
+
+				if ui.button("🔄 Update").clicked() {
 					let _ = self
 						.command_tx
 						.send(EmulatorCommand::Debug(DebugCommand::RequestDisassembly {
-							pc: cpu.pc,
+							pc: self.disassembly_pc,
 							before: self.disassembly_before as usize,
 							after: self.disassembly_after as usize,
 						}));
 				}
-			}
+
+				if ui.button("➡️ Go to PC").clicked() {
+					if let Some(cpu) = &self.cpu_state {
+						self.disassembly_pc = cpu.pc;
+						let _ =
+							self
+								.command_tx
+								.send(EmulatorCommand::Debug(DebugCommand::RequestDisassembly {
+									pc: cpu.pc,
+									before: self.disassembly_before as usize,
+									after: self.disassembly_after as usize,
+								}));
+					}
+				}
+			});
 		});
 
 		ui.separator();

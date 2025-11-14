@@ -112,7 +112,9 @@ impl EmuChanGui {
 			egui::menu::bar(ui, |ui| {
 				ui.menu_button("File", |ui| {
 					if ui.button("📂 Load Rom").clicked() {
+						let current_dir = std::env::current_dir().unwrap();
 						if let Some(path) = rfd::FileDialog::new()
+							.set_directory(current_dir)
 							.add_filter("Game Boy ROM", &["gb"])
 							.pick_file()
 						{
