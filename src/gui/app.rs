@@ -59,11 +59,12 @@ impl eframe::App for EmuChanGui {
 		self.emulator.run_one_frame();
 
 		self.ui_top_panel(ctx);
+
+		self.debugger_window.show_panels(ctx);
+		self.debugger_window.show_test_window(ctx);
+
 		self.ui_central_panel(ctx);
 		self.ui_bottom_painel(ctx);
-
-		// Renderiza as janelas do debugger
-		self.debugger_window.show(ctx);
 
 		ctx.request_repaint();
 	}

@@ -212,8 +212,18 @@ impl EmuChan {
 
 			DebugCommand::ReadMemory(addr, count) => {
 				let bus = self.bus.lock().unwrap();
-				let end = (addr as usize + count).min(bus.memory.len());
-				let data = bus.memory[addr as usize..end].to_vec();
+				// let end = (addr as usize + count).min(bus.memory.len());
+				// let data = bus.memory[addr as usize..end].to_vec();
+				let mut data = Vec::new();
+
+				for i in 0..count {
+					if i >= bus.memory.len() {
+						return;
+					}
+
+					let value = bus.read(addr + i as u16);
+					data.push(value);
+				}
 
 				let _ = self
 					.event_tx
