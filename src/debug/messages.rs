@@ -66,6 +66,14 @@ pub enum DebugCommand {
 	},
 	SetTrace(bool),
 	RunSM83Test(PathBuf),
+
+	RequestPpuState,
+	RequestTileData {
+		tile_index: u8,
+	},
+	RequestTileMap {
+		map_select: bool,
+	}, // false = 0x9800, true = 0x9C00
 }
 
 #[derive(Debug, Clone)]
@@ -94,6 +102,10 @@ pub enum DebugEvent {
 		passed: bool,
 		message: String,
 	},
+
+	PpuState(PpuDebugState),
+	TileData(TileDebugData),
+	TileMapData(TileMapDebugData),
 }
 
 #[derive(Debug, Clone)]
@@ -129,4 +141,49 @@ pub struct DisassemblyLine {
 	pub mnemonic: String,
 	pub operands: String,
 	pub cycles: u8,
+}
+
+#[derive(Debug, Clone)]
+pub struct PpuDebugState {
+	pub lcd_enable: bool,
+	pub window_tile_map: bool,
+	pub window_enable: bool,
+	pub bg_window_tile_data: bool,
+	pub bg_tile_map: bool,
+	pub obj_size: bool,
+	pub obj_enable: bool,
+	pub bg_window_enable: bool,
+
+	pub mode: u8, // 0-3
+	pub lyc_ly_flag: bool,
+	pub mode0_interrupt: bool,
+	pub mode1_interrupt: bool,
+	pub mode2_interrupt: bool,
+	pub lyc_interrupt: bool,
+
+	pub scy: u8,
+	pub scx: u8,
+	pub ly: u8,
+	pub lyc: u8,
+	pub wy: u8,
+	pub wx: u8,
+
+	pub bgp: u8,
+	pub obp0: u8,
+	pub obp1: u8,
+
+	pub current_mode: String,
+	pub cycles: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct TileDebugData {
+	pub tile_index: u8,
+	pub pixels: Vec<u8>, // 8x8 = 64 pixels, valores 0-3
+}
+
+#[derive(Debug, Clone)]
+pub struct TileMapDebugData {
+	pub map_select: bool,
+	pub tiles: Vec<u8>, // 32x32 = 1024 tile indices
 }

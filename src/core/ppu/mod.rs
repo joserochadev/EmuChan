@@ -4,7 +4,7 @@ use std::fmt;
 mod common;
 mod register;
 
-use crate::config::GAMEBOY_RESOLUTION;
+use crate::{config::GAMEBOY_RESOLUTION, debug::messages::PpuDebugState};
 use common::pallete::Pallete;
 use register::{lcdc::LCDC, stat::STAT};
 
@@ -265,6 +265,97 @@ impl PPU {
 			print!("{:02X} ", byte);
 		}
 		println!();
+	}
+}
+
+impl PPU {
+	pub fn get_tile_data(&self, tile_index: u8) -> Vec<u8> {
+		let mut pixels = Vec::with_capacity(64);
+		let tile_address = (tile_index as usize) * 16;
+
+		for row in 0..8 {
+			let byte1 = self.vram[tile_address + (row * 2)];
+			let byte2 = self.vram[tile_address + (row * 2) + 1];
+
+			for bit in (0..8).rev() {
+				let lo = (byte1 >> bit) & 1;
+				let hi = (byte2 >> bit) & 1;
+				let color = (hi << 1) | lo;
+				pixels.push(color);
+			}
+		}
+
+		pixels
+	}
+
+	/// Extrai todos os tiles do tilemap
+	pub fn get_tilemap_data(&self, map_select: bool) -> Vec<u8> {
+		let base = if map_select { 0x1C00 } else { 0x1800 };
+		self.vram[base..base + 1024].to_vec()
+	}
+
+	/// Retorna o estado de debug da PPU
+	pub fn get_debug_state(&self) -> (PpuDebugState, String) {
+		use crate::core::ppu::register::lcdc::LCDC;
+
+		let mode_str = match self.mode {
+			Mode::HBlank => "HBlank",
+			Mode::VBlank => "VBlank",
+			Mode::AccessOAM => "OAM",
+			Mode::AccessVRAM => "VRAM",
+		};
+
+		let state = PpuDebugState {
+			// LCDC flags
+			lcd_enable: self.lcdc.is_set(LCDC::LCD_ON),
+			window_tile_map: self.lcdc.is_set(LCDC::WINDOW_MAP),
+			window_enable: self.lcdc.is_set(LCDC::WINDOW_ON),
+			bg_window_tile_data: self.lcdc.is_set(LCDC::BG_ADDR),
+			bg_tile_map: self.lcdc.is_set(LCDC::BG_MAP),
+			obj_size: self.lcdc.is_set(LCDC::OBJ_SIZE),
+			obj_enable: self.lcdc.is_set(LCDC::OBJ_ON),
+			bg_window_enable: self.lcdc.is_set(LCDC::BG_ON),
+
+			// STAT
+			mode: match self.mode {
+				Mode::HBlank => 0,
+				Mode::VBlank => 1,
+				Mode::AccessOAM => 2,
+				Mode::AccessVRAM => 3,
+			},
+			lyc_ly_flag: self.ly == self.lyc,
+			mode0_interrupt: self
+				.stat
+				.is_set(crate::core::ppu::register::stat::STAT::HBLANK_INT),
+			mode1_interrupt: self
+				.stat
+				.is_set(crate::core::ppu::register::stat::STAT::VBLANK_INT),
+			mode2_interrupt: self
+				.stat
+				.is_set(crate::core::ppu::register::stat::STAT::OAM_INT),
+			lyc_interrupt: self
+				.stat
+				.is_set(crate::core::ppu::register::stat::STAT::LYC_INT),
+
+			// Scroll & Window
+			scy: self.scy,
+			scx: self.scx,
+			ly: self.ly,
+			lyc: self.lyc,
+			wy: self.wy,
+			wx: self.wx,
+
+			// Palettes
+			bgp: self.bg_pallete.get_pallete(),
+			obp0: self.obj0_pallete.get_pallete(),
+			obp1: self.obj1_pallete.get_pallete(),
+
+			// Internal
+			current_mode: mode_str.to_string(),
+			cycles: self.cycles,
+		};
+
+		(state, mode_str.to_string())
 	}
 }
 

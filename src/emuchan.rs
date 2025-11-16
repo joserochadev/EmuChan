@@ -10,7 +10,7 @@ use crate::debug::debugger::Debugger;
 use crate::debug::disassembler::Disassembler;
 use crate::debug::messages::{
 	CpuDebugState, DebugCommand, DebugEvent, DisassemblyView, EmulatorCommand, EmulatorEvent,
-	EmulatorState,
+	EmulatorState, TileDebugData, TileMapDebugData,
 };
 use crate::tests::sm83::SM83;
 
@@ -259,6 +259,37 @@ impl EmuChan {
 
 			DebugCommand::RunSM83Test(path) => {
 				self.run_sm83_test(path);
+			}
+
+			DebugCommand::RequestPpuState => {
+				let ppu = self.ppu.lock().unwrap();
+				let (state, _) = ppu.get_debug_state();
+
+				let _ = self
+					.event_tx
+					.send(EmulatorEvent::Debug(DebugEvent::PpuState(state)));
+			}
+
+			DebugCommand::RequestTileData { tile_index } => {
+				let ppu = self.ppu.lock().unwrap();
+				let pixels = ppu.get_tile_data(tile_index);
+
+				let tile_data = TileDebugData { tile_index, pixels };
+
+				let _ = self
+					.event_tx
+					.send(EmulatorEvent::Debug(DebugEvent::TileData(tile_data)));
+			}
+
+			DebugCommand::RequestTileMap { map_select } => {
+				let ppu = self.ppu.lock().unwrap();
+				let tiles = ppu.get_tilemap_data(map_select);
+
+				let tilemap_data = TileMapDebugData { map_select, tiles };
+
+				let _ = self
+					.event_tx
+					.send(EmulatorEvent::Debug(DebugEvent::TileMapData(tilemap_data)));
 			}
 
 			_ => {}
