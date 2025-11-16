@@ -279,33 +279,58 @@ impl EmuChan {
 			}));
 
 		let mut sm83 = SM83::new();
-		// Run the test
+
 		let result = sm83.run_test(path.to_string_lossy().to_string());
 
 		match result {
 			Ok(report) => {
-				// Send test results
-				// let _ = self
-				// 	.event_tx
-				// 	.send(EmulatorEvent::Debug(DebugEvent::TestResult {
-				// 		test_name: test_name.clone(),
-				// 		passed: true,
-				// 		message: format!(
-				// 			"Passed: {}/{} - Failed: {}",
-				// 			report.passed, report.total, report.failed
-				// 		),
-				// 	}));
+				let summary_passed = report.passed == report.total;
+				let summary_msg =
+					format!("Passed: {}/{} | Failed: {}", report.passed, report.total, report.failed);
 
-				// // Send individual failures
-				// for failure in report.failures {
-				// 	let _ = self
-				// 		.event_tx
-				// 		.send(EmulatorEvent::Debug(DebugEvent::TestResult {
-				// 			test_name: failure.test_name.clone(),
-				// 			passed: false,
-				// 			message: format!("Expected: {:?}, Got: {:?}", failure.expected, failure.actual),
-				// 		}));
-				// }
+				let _ = self
+					.event_tx
+					.send(EmulatorEvent::Debug(DebugEvent::TestResult {
+						test_name: test_name.clone(),
+						passed: summary_passed,
+						message: summary_msg,
+					}));
+
+				for (idx, failure) in report.failures.iter().enumerate() {
+					let failure_msg = format!(
+						"Test #{}: {}\nExpected: {}\nGot: {}",
+						idx + 1,
+						failure.test_name,
+						failure.expected,
+						failure.actual
+					);
+
+					let _ = self
+						.event_tx
+						.send(EmulatorEvent::Debug(DebugEvent::TestResult {
+							test_name: failure.test_name.clone(),
+							passed: false,
+							message: failure_msg,
+						}));
+				}
+
+				if summary_passed {
+					let _ = self
+						.event_tx
+						.send(EmulatorEvent::Debug(DebugEvent::TestResult {
+							test_name: "Summary".to_string(),
+							passed: true,
+							message: "✅ All tests passed!".to_string(),
+						}));
+				} else {
+					let _ = self
+						.event_tx
+						.send(EmulatorEvent::Debug(DebugEvent::TestResult {
+							test_name: "Summary".to_string(),
+							passed: false,
+							message: format!("❌ {} test(s) failed", report.failed),
+						}));
+				}
 			}
 			Err(e) => {
 				let _ = self

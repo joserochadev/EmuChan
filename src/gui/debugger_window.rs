@@ -1,5 +1,3 @@
-// src/gui/debugger_window.rs
-
 use crate::debug::messages::*;
 use eframe::egui::*;
 use std::sync::mpsc::Sender;
@@ -30,7 +28,7 @@ pub struct DebuggerWindow {
 	memory_base_address: u16,
 
 	// Breakpoints
-	breakpoint_input: String,
+	// breakpoint_input: String,
 	breakpoints: Vec<u16>,
 
 	// Trace
@@ -47,7 +45,7 @@ impl DebuggerWindow {
 	pub fn new(command_tx: Sender<EmulatorCommand>) -> Self {
 		Self {
 			command_tx,
-			show_debugger: false,
+			show_debugger: true,
 			show_sm83_test: false,
 			cpu_state: None,
 			disassembly: None,
@@ -58,7 +56,6 @@ impl DebuggerWindow {
 			memory_size: "256".to_string(),
 			memory_data: vec![],
 			memory_base_address: 0,
-			breakpoint_input: String::new(),
 			breakpoints: vec![],
 			trace_enabled: false,
 			trace_logs: vec![],
@@ -72,11 +69,11 @@ impl DebuggerWindow {
 
 	pub fn show_menu(&mut self, ui: &mut Ui) {
 		ui.menu_button("Debug", |ui| {
-			ui.checkbox(&mut self.show_debugger, "🐛 Show Debugger");
+			ui.checkbox(&mut self.show_debugger, "Show Debugger");
 
 			ui.separator();
 
-			if ui.button("🧪 SM83 Test Runner").clicked() {
+			if ui.button("SM83 Test Runner").clicked() {
 				self.show_sm83_test = true;
 				ui.close_menu();
 			}
@@ -132,7 +129,7 @@ impl DebuggerWindow {
 		TopBottomPanel::bottom("debug_bottom_panel")
 			.resizable(true)
 			.default_height(200.0)
-			.min_height(300.0)
+			.min_height(350.0)
 			.show(ctx, |ui| {
 				self.draw_bottom_panel(ui);
 			});
@@ -154,23 +151,23 @@ impl DebuggerWindow {
 
 	fn draw_left_panel(&mut self, ui: &mut Ui) {
 		// Controles de execução
-		ui.heading("⚙️ Controls");
+		ui.heading("⚙ Controls");
 		ui.separator();
 
 		ui.vertical(|ui| {
-			if ui.button("▶️ Step Instruction").clicked() {
+			if ui.button("▶ Step Instruction").clicked() {
 				let _ = self
 					.command_tx
 					.send(EmulatorCommand::Debug(DebugCommand::StepInstruction));
 			}
 
-			if ui.button("⏭️ Step Frame").clicked() {
+			if ui.button("⏭ Step Frame").clicked() {
 				let _ = self
 					.command_tx
 					.send(EmulatorCommand::Debug(DebugCommand::StepFrame));
 			}
 
-			if ui.button("▶️ Continue").clicked() {
+			if ui.button("▶ Continue").clicked() {
 				let _ = self.command_tx.send(EmulatorCommand::TogglePause);
 			}
 		});
@@ -178,7 +175,7 @@ impl DebuggerWindow {
 		ui.add_space(10.0);
 
 		// Registradores
-		ui.heading("📊 Registers");
+		ui.heading("Registers");
 		ui.separator();
 
 		if let Some(cpu) = &self.cpu_state {
@@ -289,7 +286,7 @@ impl DebuggerWindow {
 						}));
 				}
 
-				if ui.button("➡️ Go to PC").clicked() {
+				if ui.button("➡ Go to PC").clicked() {
 					if let Some(cpu) = &self.cpu_state {
 						self.disassembly_pc = cpu.pc;
 						let _ =
@@ -372,8 +369,8 @@ impl DebuggerWindow {
 
 	fn draw_bottom_panel(&mut self, ui: &mut Ui) {
 		ui.horizontal(|ui| {
-			ui.selectable_value(&mut self.show_bottom_tab(), BottomTab::Memory, "💾 Memory");
-			ui.selectable_value(&mut self.show_bottom_tab(), BottomTab::Trace, "📜 Trace");
+			ui.selectable_value(&mut self.show_bottom_tab(), BottomTab::Memory, "Memory");
+			ui.selectable_value(&mut self.show_bottom_tab(), BottomTab::Trace, "Trace");
 		});
 
 		ui.separator();

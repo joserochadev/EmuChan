@@ -1,4 +1,3 @@
-use colored::Colorize;
 use serde::Deserialize;
 use std::fmt;
 use std::fs::File;
@@ -9,7 +8,7 @@ use crate::core::bus::BUS;
 use crate::core::cpu::CPU;
 
 #[derive(Debug, Clone, Copy, Deserialize)]
-struct RegisteState {
+struct RegisterState {
 	pc: u16,
 	sp: u16,
 	a: u8,
@@ -24,7 +23,7 @@ struct RegisteState {
 	ie: Option<u8>,
 }
 
-impl fmt::Display for RegisteState {
+impl fmt::Display for RegisterState {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(
 			f,
@@ -49,47 +48,29 @@ impl fmt::Display for RegisteState {
 #[derive(Debug, Deserialize)]
 struct MemoryState(u16, Option<u8>, String);
 
-impl fmt::Display for MemoryState {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "Address: {:#06X}, Value: {:?}, Description: {}", self.0, self.1, self.2)
-	}
-}
-
 #[derive(Debug, Deserialize)]
 struct Snapshot {
 	name: String,
-	initial: RegisteState,
-	final_: RegisteState,
+	initial: RegisterState,
+	final_: RegisterState,
 	cycles: Vec<MemoryState>,
 }
 
-impl fmt::Display for Snapshot {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(
-			f,
-			"{}: {}\n\
-           {}:\n{}\n\
-           {}:\n{}\n\
-          {}:\n{}\n",
-			"Name".bold().yellow(),
-			self.name,
-			"Initial State".bold().cyan(),
-			self.initial,
-			"Final State".bold().cyan(),
-			self.final_,
-			"Memory Cycles".bold().purple(),
-			self
-				.cycles
-				.iter()
-				.map(|cycle| format!("{}", cycle))
-				.collect::<Vec<_>>()
-				.join("\n")
-		)
-	}
+pub struct TestReport {
+	pub passed: usize,
+	pub failed: usize,
+	pub total: usize,
+	pub failures: Vec<TestFailure>,
+}
+
+pub struct TestFailure {
+	pub test_name: String,
+	pub expected: String,
+	pub actual: String,
 }
 
 pub struct SM83 {
-	_bus: Arc<Mutex<BUS>>,
+	bus: Arc<Mutex<BUS>>,
 	cpu: CPU,
 }
 
@@ -98,11 +79,11 @@ impl SM83 {
 		let bus = Arc::new(Mutex::new(BUS::new()));
 		let cpu = CPU::new(Arc::clone(&bus));
 
-		Self { _bus: bus, cpu }
+		Self { bus, cpu }
 	}
 
-	fn inject(&mut self, intial_state: RegisteState) {
-		let RegisteState {
+	fn inject(&mut self, initial_state: RegisterState) {
+		let RegisterState {
 			pc,
 			sp,
 			a,
@@ -113,8 +94,10 @@ impl SM83 {
 			f,
 			h,
 			l,
+			ime,
+			ie,
 			..
-		} = intial_state;
+		} = initial_state;
 
 		self.cpu.reg.a = a;
 		self.cpu.reg.b = b;
@@ -126,40 +109,32 @@ impl SM83 {
 		self.cpu.reg.l = l;
 		self.cpu.reg.pc = pc;
 		self.cpu.reg.sp = sp;
+		self.cpu.reg.ime = ime;
+
+		if let Some(ie_val) = ie {
+			self.cpu.reg.ie = ie_val;
+		}
 	}
 
-	fn retrive(&self) -> RegisteState {
-		let a = self.cpu.reg.a;
-		let b = self.cpu.reg.b;
-		let c = self.cpu.reg.c;
-		let d = self.cpu.reg.d;
-		let e = self.cpu.reg.e;
-		let f = self.cpu.reg.f;
-		let h = self.cpu.reg.h;
-		let l = self.cpu.reg.l;
-		let pc = self.cpu.reg.pc;
-		let sp = self.cpu.reg.sp;
-		let ime = self.cpu.reg.ime;
-		let ie = self.cpu.reg.ie;
-
-		return RegisteState {
-			a,
-			b,
-			c,
-			d,
-			e,
-			f,
-			h,
-			l,
-			pc,
-			sp,
-			ime,
-			ie: Some(ie),
-		};
+	fn retrieve(&self) -> RegisterState {
+		RegisterState {
+			a: self.cpu.reg.a,
+			b: self.cpu.reg.b,
+			c: self.cpu.reg.c,
+			d: self.cpu.reg.d,
+			e: self.cpu.reg.e,
+			f: self.cpu.reg.f,
+			h: self.cpu.reg.h,
+			l: self.cpu.reg.l,
+			pc: self.cpu.reg.pc,
+			sp: self.cpu.reg.sp,
+			ime: self.cpu.reg.ime,
+			ie: Some(self.cpu.reg.ie),
+		}
 	}
 
-	fn compare_state(&self, expected: &RegisteState) -> bool {
-		let actual = self.retrive();
+	fn compare_state(&self, expected: &RegisterState) -> bool {
+		let actual = self.retrieve();
 		expected.pc == actual.pc
 			&& expected.sp == actual.sp
 			&& expected.a == actual.a
@@ -172,52 +147,71 @@ impl SM83 {
 			&& expected.l == actual.l
 	}
 
-	pub fn run_test(&mut self, file_path: String) -> Result<(), String> {
-		let snapshots = load_json_test(file_path);
+	pub fn run_test(&mut self, file_path: String) -> Result<TestReport, String> {
+		let snapshots = match load_json_test(&file_path) {
+			Ok(snaps) => snaps,
+			Err(e) => return Err(format!("Failed to load test file: {}", e)),
+		};
+
+		let mut passed = 0;
+		let mut failed = 0;
+		let mut failures = Vec::new();
 
 		for snapshot in snapshots {
+			// Reset CPU state
 			self.inject(snapshot.initial);
 
+			// Write memory cycles
 			for cycle in &snapshot.cycles {
 				let MemoryState(addr, data, _description) = cycle;
-				self.cpu.write(*addr, data.unwrap_or(0));
+				if let Some(value) = data {
+					self.cpu.write(*addr, *value);
+				}
 			}
 
+			// Execute one instruction
 			if let Err(e) = self.cpu.step() {
-				return Err(format!("CPU step error on test '{}': {}", snapshot.name, e));
+				failures.push(TestFailure {
+					test_name: snapshot.name.clone(),
+					expected: format!("{}", snapshot.final_),
+					actual: format!("CPU Error: {}", e),
+				});
+				failed += 1;
+				continue;
 			}
 
+			// Compare results
 			if self.compare_state(&snapshot.final_) {
-				let m = format!("Test: {} OK", snapshot.name);
-				// println!("{}\n", m.bold().green());
+				passed += 1;
 			} else {
-				// let m = format!("Test: {} FAILED", snapshot.name);
-				// println!("{}\n", m.bold().red());
-
-				// println!("Snapshot Final:\n{}", snapshot);
-				// println!("CPU Final State:\n{}", self.cpu);
-
-				// panic!("{}\n", m.bold().red());
-				let error_report = format!(
-					"Test FAILED: {}\n\nExpected:\n{}\n\nGot:\n{}",
-					snapshot.name,
-					snapshot.final_, // Usa o `impl Display for RegisteState`
-					self.retrive()   // Pega o estado atual para comparação
-				);
-				return Err(error_report);
+				failures.push(TestFailure {
+					test_name: snapshot.name.clone(),
+					expected: format!("{}", snapshot.final_),
+					actual: format!("{}", self.retrieve()),
+				});
+				failed += 1;
 			}
 		}
 
-		return Ok(());
+		let total = passed + failed;
+
+		Ok(TestReport {
+			passed,
+			failed,
+			total,
+			failures,
+		})
 	}
 }
 
-fn load_json_test(file_path: String) -> Vec<Snapshot> {
-	let file = File::open(file_path).expect("\nErro ao abrir o arquivo JSON\nTest file not found.\n");
+fn load_json_test(file_path: &str) -> Result<Vec<Snapshot>, String> {
+	let file =
+		File::open(file_path).map_err(|e| format!("Failed to open file '{}': {}", file_path, e))?;
+
 	let buffer = BufReader::new(file);
 
-	let snapshots: Vec<Snapshot> = serde_json::from_reader(buffer)
-		.expect("\nERRO: serde_json - can't convert json to Snapshot struct.\n");
+	let snapshots: Vec<Snapshot> =
+		serde_json::from_reader(buffer).map_err(|e| format!("Failed to parse JSON: {}", e))?;
 
-	return snapshots;
+	Ok(snapshots)
 }

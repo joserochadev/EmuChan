@@ -108,6 +108,7 @@ fn main() -> Result<(), eframe::Error> {
 	let options = eframe::NativeOptions {
 		centered: true,
 		viewport: egui::ViewportBuilder::default()
+			.with_maximized(true)
 			.with_inner_size([640.0, 600.0])
 			.with_title("EmuChan"),
 		..Default::default()

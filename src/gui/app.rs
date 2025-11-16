@@ -149,7 +149,7 @@ impl EmuChanGui {
 						let _ = self.command_tx.send(EmulatorCommand::Reset);
 					}
 
-					if ui.button("⏹️ Stop").clicked() {
+					if ui.button("⏹ Stop").clicked() {
 						let _ = self.command_tx.send(EmulatorCommand::Stop);
 					}
 				});
