@@ -44,7 +44,7 @@ impl Disassembler {
 		let imm16 = || {
 			let low = memory.get(addr + 1).copied().unwrap_or(0);
 			let high = memory.get(addr + 2).copied().unwrap_or(0);
-			u16::from_be_bytes([low, high])
+			u16::from_be_bytes([high, low])
 		};
 
 		match opcode {
