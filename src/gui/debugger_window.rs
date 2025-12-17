@@ -1,6 +1,6 @@
 use crate::debug::messages::*;
 use eframe::egui::*;
-use std::sync::mpsc::Sender;
+use std::{path::Path, sync::mpsc::Sender};
 
 pub struct DebuggerWindow {
 	// Comunicação
@@ -930,6 +930,7 @@ impl DebuggerWindow {
 			if ui.button("📂 Select Test File").clicked() {
 				if let Some(path) = rfd::FileDialog::new()
 					.add_filter("JSON Test Files", &["json"])
+					.set_directory(Path::new("roms/sm38"))
 					.pick_file()
 				{
 					let _ = self

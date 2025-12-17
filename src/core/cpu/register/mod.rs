@@ -16,6 +16,7 @@ pub enum Register16 {
 	DE,
 	HL,
 	SP,
+	PC,
 }
 
 pub enum Flags {
@@ -77,6 +78,7 @@ impl Register {
 			Register16::DE => ((self.d as u16) << 8) | (self.e as u16),
 			Register16::HL => ((self.h as u16) << 8) | (self.l as u16),
 			Register16::SP => self.sp,
+			Register16::PC => self.pc,
 		}
 	}
 
@@ -104,6 +106,7 @@ impl Register {
 			Register16::SP => {
 				self.sp = value;
 			}
+			Register16::PC => self.pc = value,
 		}
 	}
 

@@ -81,6 +81,7 @@ impl<'a> Opcode<'a> {
 				self.cp_a(value);
 				self.cpu.set_cycles(8);
 			}
+
 			0xFE => {
 				let value = self.cpu.fetch();
 				self.cp_a(value);
@@ -110,6 +111,8 @@ impl<'a> Opcode<'a> {
 			0xD8 => self.ret_cc(Condition::C),
 
 			0xCB => self.decode_cb()?,
+
+			0xC3 => self.jp_imm16(),
 
 			_ => return Err(format!("Unknow instruction. OPCODE: {:02X}", instruction)),
 		}
@@ -189,6 +192,12 @@ impl<'a> Opcode<'a> {
 			Condition::NC => self.cpu.reg.get_flag(Flags::C) == 0,
 			Condition::C => self.cpu.reg.get_flag(Flags::C) == 1,
 		}
+	}
+
+	fn jp_imm16(&mut self) {
+		let addr = self.cpu.fetch16();
+		self.cpu.reg.set_r16(Register16::PC, addr);
+		self.cpu.set_cycles(16);
 	}
 
 	// load a immediate value in a register (LD r, u8)

@@ -125,6 +125,24 @@ impl Disassembler {
 				}
 			}
 
+			// LD r8, r8
+			0x4F | 0x57 | 0x67 => {
+				let reg = match opcode {
+					0x4F => "C",
+					0x57 => "D",
+					0x67 => "H",
+					_ => unreachable!(),
+				};
+
+				DisassemblyLine {
+					address,
+					bytes: vec![opcode],
+					mnemonic: "LD".to_string(),
+					operands: format!("{}, A", reg),
+					cycles: 4,
+				}
+			}
+
 			_ => DisassemblyLine {
 				address,
 				bytes: vec![opcode],
