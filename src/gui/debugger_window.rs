@@ -1,5 +1,5 @@
 use crate::debug::messages::*;
-use eframe::egui::*;
+use eframe::egui::{self, *};
 use std::{path::Path, sync::mpsc::Sender};
 
 pub struct DebuggerWindow {
@@ -50,6 +50,9 @@ pub struct DebuggerWindow {
 	current_ppu_tab: PpuTab,
 	vram_tiles: Vec<Vec<u8>>,
 	vram_tiles_loaded: bool,
+
+	// Textures
+	tilemap_texture: Option<TextureHandle>,
 }
 
 impl DebuggerWindow {
@@ -89,6 +92,7 @@ impl DebuggerWindow {
 			current_ppu_tab: PpuTab::Registers,
 			vram_tiles: Vec::new(),
 			vram_tiles_loaded: false,
+			tilemap_texture: None,
 		}
 	}
 
@@ -757,43 +761,87 @@ impl DebuggerWindow {
 			ScrollArea::both().show(ui, |ui| {
 				ui.label(format!("Tilemap at ${}", if tilemap.map_select { "9C00" } else { "9800" }));
 
-				// Renderizar tilemap graficamente (32x32 tiles = 256x256 pixels)
-				let tilemap_size = 32.0 * 16.0; // 32 tiles * 16 pixels por tile (8x8 dobrado)
-				let (rect, _) = ui.allocate_exact_size(vec2(tilemap_size, tilemap_size), Sense::hover());
+				let frame = &tilemap.tiles;
 
-				let painter = ui.painter();
+				// Criar buffer de imagem 256x256 (32x32 tiles, cada tile 8x8 pixels)
+				let width = 256;
+				let height = 256;
+				let mut pixel_buffer = vec![Color32::BLACK; width * height];
 
-				for row in 0..32 {
-					for col in 0..32 {
-						let idx = row * 32 + col;
-						let tile_id = tilemap.tiles[idx] as usize;
+				// Renderizar cada tile
+				for tile_y in 0..32 {
+					for tile_x in 0..32 {
+						let tile_idx = tile_y * 32 + tile_x;
+
+						if tile_idx >= frame.len() {
+							continue;
+						}
+
+						let tile_id = frame[tile_idx] as usize;
 
 						if tile_id >= self.vram_tiles.len() {
 							continue;
 						}
 
-						let pixels = &self.vram_tiles[tile_id];
+						let tile_pixels = &self.vram_tiles[tile_id];
 
-						let base_x = rect.min.x + (col as f32 * 16.0);
-						let base_y = rect.min.y + (row as f32 * 16.0);
+						// Copiar pixels do tile para o buffer
+						for pixel_y in 0..8 {
+							for pixel_x in 0..8 {
+								let tile_pixel_idx = pixel_y * 8 + pixel_x;
 
-						for y in 0..8 {
-							for x in 0..8 {
-								let pixel_idx = y * 8 + x;
-								let color_id = pixels[pixel_idx];
-								let color = self.tile_palette[color_id as usize];
+								if tile_pixel_idx >= tile_pixels.len() {
+									continue;
+								}
 
-								let px = base_x + (x as f32 * 2.0);
-								let py = base_y + (y as f32 * 2.0);
-								let pixel_rect = Rect::from_min_size(pos2(px, py), vec2(2.0, 2.0));
+								let pixel_color_id = tile_pixels[tile_pixel_idx];
 
-								painter.rect_filled(pixel_rect, 0.0, color);
+								// Calcular posição no buffer final
+								let img_x = tile_x * 8 + pixel_x;
+								let img_y = tile_y * 8 + pixel_y;
+								let img_idx = img_y * width + img_x;
+
+								if img_idx >= pixel_buffer.len() {
+									continue;
+								}
+
+								// Obter cor da paleta
+								let color = if (pixel_color_id as usize) < self.tile_palette.len() {
+									self.tile_palette[pixel_color_id as usize]
+								} else {
+									Color32::MAGENTA // Cor de erro
+								};
+
+								pixel_buffer[img_idx] = color;
 							}
 						}
 					}
 				}
 
-				// painter.rect_stroke(rect, 0.0, Stroke::new(1.0, Color32::from_gray(128)));
+				// Converter para RGBA
+				let rgba_buffer: Vec<u8> = pixel_buffer.iter().flat_map(|c| c.to_array()).collect();
+
+				// Criar imagem
+				let image = ColorImage::from_rgba_unmultiplied([width, height], &rgba_buffer);
+
+				// Atualizar ou criar textura
+				if let Some(texture) = &mut self.tilemap_texture {
+					texture.set(image, TextureOptions::NEAREST);
+				} else {
+					self.tilemap_texture = Some(ui.ctx().load_texture(
+						"tilemap_texture",
+						image,
+						TextureOptions::NEAREST,
+					));
+				}
+
+				// Renderizar textura com escala
+				if let Some(texture) = &self.tilemap_texture {
+					let scale = 2.0; // Escala para melhor visualização
+					let size = vec2(width as f32 * scale, height as f32 * scale);
+					let image = egui::Image::new(texture).fit_to_exact_size(size);
+					ui.add(image);
+				}
 			});
 		} else {
 			ui.colored_label(Color32::GRAY, "Click 'Load Tilemap' to view");
