@@ -53,6 +53,8 @@ pub struct DebuggerWindow {
 
 	// Textures
 	tilemap_texture: Option<TextureHandle>,
+	vram_texture: Option<TextureHandle>,
+	vram_data: Option<VramDebugData>,
 }
 
 impl DebuggerWindow {
@@ -93,6 +95,8 @@ impl DebuggerWindow {
 			vram_tiles: Vec::new(),
 			vram_tiles_loaded: false,
 			tilemap_texture: None,
+			vram_texture: None,
+			vram_data: None,
 		}
 	}
 
@@ -648,88 +652,78 @@ impl DebuggerWindow {
 
 	fn draw_vram_viewer(&mut self, ui: &mut Ui) {
 		ui.horizontal(|ui| {
-			ui.label("VRAM Tile Viewer");
+			ui.label("VRAM Buffer Viewer");
 
-			if ui.button("Load All Tiles").clicked() {
-				self.load_all_vram_tiles();
+			if ui.button("Load VRAM Buffer").clicked() {
+				let _ = self
+					.command_tx
+					.send(EmulatorCommand::Debug(DebugCommand::RequestVramBuffer));
 			}
 		});
 
 		ui.separator();
 
-		if !self.vram_tiles_loaded || self.vram_tiles.is_empty() {
-			ui.colored_label(Color32::GRAY, "Click 'Load All Tiles' to view VRAM");
-			return;
+		// Se temos dados da VRAM mas não a textura, criar a textura
+		if self.vram_texture.is_none() {
+			if let Some(vram_data) = self.vram_data.clone() {
+				self.update_vram_texture(ui.ctx(), &vram_data);
+			}
 		}
 
-		ScrollArea::both().show(ui, |ui| {
-			// Mostrar tiles em grid 16x24 (384 tiles total)
-			Grid::new("vram_tiles_grid")
-				// .spacing([2.0, 2.0])
-				.show(ui, |ui| {
-					for row in 0..24 {
-						for col in 0..16 {
-							let tile_idx = row * 16 + col;
+		if let Some(texture) = &self.vram_texture {
+			// Exibir a textura da VRAM
+			let scale = 2.0; // Escala para melhor visualização
+			let [width, height] = texture.size();
+			let size = vec2(width as f32 * scale, height as f32 * scale);
 
-							if tile_idx >= self.vram_tiles.len() {
-								break;
-							}
+			ScrollArea::both().show(ui, |ui| {
+				let image = egui::Image::new(texture)
+					.fit_to_exact_size(size)
+					.texture_options(TextureOptions::NEAREST);
+				ui.add(image);
 
-							let scale = 4.0;
-							let tile_size = 8.0 * scale; // 8x8 pixels dobrados
-							let (rect, response) =
-								ui.allocate_exact_size(vec2(tile_size, tile_size), Sense::click());
-
-							// Desenhar tile
-							let painter = ui.painter();
-							let pixels = &self.vram_tiles[tile_idx];
-
-							for y in 0..8 {
-								for x in 0..8 {
-									let pixel_idx = y * 8 + x;
-									let color_id = pixels[pixel_idx];
-									let color = self.tile_palette[color_id as usize];
-
-									let px = rect.min.x + (x as f32 * scale);
-									let py = rect.min.y + (y as f32 * scale);
-									let pixel_rect = Rect::from_min_size(pos2(px, py), vec2(scale, scale));
-
-									painter.rect_filled(pixel_rect, 0.0, color);
-								}
-							}
-
-							// Border
-							// painter.rect_stroke(rect, 0.0, Stroke::new(1.0, Color32::from_gray(100)));
-
-							if response.clicked() {
-								self.selected_tile = tile_idx as u8;
-								self.current_ppu_tab = PpuTab::Tiles;
-								let _ =
-									self
-										.command_tx
-										.send(EmulatorCommand::Debug(DebugCommand::RequestTileData {
-											tile_index: tile_idx as u8,
-										}));
-							}
-
-							response.on_hover_text(format!("Tile ${:02X}", tile_idx));
-						}
-						ui.end_row();
-					}
-				});
-		});
+				ui.separator();
+				if let Some(vram_data) = &self.vram_data {
+					ui.label(format!(
+						"VRAM Size: {}x{} pixels (scaled to {}x{})",
+						vram_data.width,
+						vram_data.height,
+						(vram_data.width as f32 * scale) as u32,
+						(vram_data.height as f32 * scale) as u32
+					));
+					ui.label(format!("Buffer size: {} bytes", vram_data.buffer.len()));
+					ui.label("Each pixel represents one byte from VRAM (0x00-0xFF)");
+				}
+			});
+		} else {
+			ui.colored_label(Color32::GRAY, "Click 'Load VRAM Buffer' to view VRAM as texture");
+		}
 	}
 
-	fn load_all_vram_tiles(&mut self) {
-		self.vram_tiles.clear();
+	fn update_vram_texture(&mut self, ctx: &Context, vram_data: &VramDebugData) {
+		// Converte o buffer da VRAM para cores
+		let color_buffer: Vec<Color32> = vram_data
+			.buffer
+			.iter()
+			.map(|&byte| {
+				// Mapeia o byte (0-255) para uma escala de cinza
+				let gray = byte;
+				Color32::from_gray(gray)
+			})
+			.collect();
 
-		// Carregar todos os 384 tiles (256 do set 0 + 128 do set 1)
-		for i in 0..384 {
-			let _ = self
-				.command_tx
-				.send(EmulatorCommand::Debug(DebugCommand::RequestTileData {
-					tile_index: i as u8,
-				}));
+		// Converte para RGBA
+		let rgba_buffer: Vec<u8> = color_buffer.iter().flat_map(|c| c.to_array()).collect();
+
+		// Cria a imagem
+		let image =
+			ColorImage::from_rgba_unmultiplied([vram_data.width, vram_data.height], &rgba_buffer);
+
+		// Atualiza ou cria a textura
+		if let Some(texture) = &mut self.vram_texture {
+			texture.set(image, TextureOptions::NEAREST);
+		} else {
+			self.vram_texture = Some(ctx.load_texture("vram_texture", image, TextureOptions::NEAREST));
 		}
 	}
 
@@ -740,8 +734,6 @@ impl DebuggerWindow {
 			ui.radio_value(&mut self.show_tilemap_1, true, "0x9C00");
 
 			if ui.button("Load Tilemap").clicked() {
-				self.load_all_vram_tiles();
-
 				let _ = self
 					.command_tx
 					.send(EmulatorCommand::Debug(DebugCommand::RequestTileMap {
@@ -1106,6 +1098,10 @@ impl DebuggerWindow {
 
 			DebugEvent::TileMapData(data) => {
 				self.tilemap_data = Some(data);
+			}
+
+			DebugEvent::VramBufferData(data) => {
+				self.vram_data = Some(data);
 			}
 
 			_ => {}

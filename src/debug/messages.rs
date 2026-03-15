@@ -74,6 +74,7 @@ pub enum DebugCommand {
 	RequestTileMap {
 		map_select: bool,
 	}, // false = 0x9800, true = 0x9C00
+	RequestVramBuffer,
 }
 
 #[derive(Debug, Clone)]
@@ -106,6 +107,7 @@ pub enum DebugEvent {
 	PpuState(PpuDebugState),
 	TileData(TileDebugData),
 	TileMapData(TileMapDebugData),
+	VramBufferData(VramDebugData),
 }
 
 #[derive(Debug, Clone)]
@@ -186,4 +188,11 @@ pub struct TileDebugData {
 pub struct TileMapDebugData {
 	pub map_select: bool,
 	pub tiles: Vec<u8>, // 32x32 = 1024 tile indices
+}
+
+#[derive(Debug, Clone)]
+pub struct VramDebugData {
+	pub buffer: Vec<u8>, // VRAM completa (8KB)
+	pub width: usize,    // Largura da visualização
+	pub height: usize,   // Altura da visualização
 }

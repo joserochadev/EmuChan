@@ -10,7 +10,7 @@ use crate::debug::debugger::Debugger;
 use crate::debug::disassembler::Disassembler;
 use crate::debug::messages::{
 	CpuDebugState, DebugCommand, DebugEvent, DisassemblyView, EmulatorCommand, EmulatorEvent,
-	EmulatorState, TileDebugData, TileMapDebugData,
+	EmulatorState, TileDebugData, TileMapDebugData, VramDebugData,
 };
 use crate::tests::sm83::SM83;
 
@@ -290,6 +290,21 @@ impl EmuChan {
 				let _ = self
 					.event_tx
 					.send(EmulatorEvent::Debug(DebugEvent::TileMapData(tilemap_data)));
+			}
+
+			DebugCommand::RequestVramBuffer => {
+				let ppu = self.ppu.lock().unwrap();
+				let (buffer, width, height) = ppu.get_vram_buffer();
+
+				let vram_data = VramDebugData {
+					buffer,
+					width,
+					height,
+				};
+
+				let _ = self
+					.event_tx
+					.send(EmulatorEvent::Debug(DebugEvent::VramBufferData(vram_data)));
 			}
 
 			_ => {}

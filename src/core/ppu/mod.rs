@@ -294,6 +294,24 @@ impl PPU {
 		self.vram[base..base + 1024].to_vec()
 	}
 
+	/// Converte a VRAM completa em um buffer de imagem para visualização
+	pub fn get_vram_buffer(&self) -> (Vec<u8>, usize, usize) {
+		// VRAM tem 8KB (0x2000 bytes)
+		// Vamos organizar como uma imagem: 256x128 pixels (cada byte = 1 pixel com valor 0-255)
+		let width = 256;
+		let height = 128;
+
+		// Copia os primeiros 32768 bytes (256*128) da VRAM para o buffer
+		let buffer_size = width * height;
+		let mut buffer = vec![0u8; buffer_size];
+
+		for i in 0..buffer_size.min(self.vram.len()) {
+			buffer[i] = self.vram[i];
+		}
+
+		(buffer, width, height)
+	}
+
 	/// Retorna o estado de debug da PPU
 	pub fn get_debug_state(&self) -> (PpuDebugState, String) {
 		use crate::core::ppu::register::lcdc::LCDC;
